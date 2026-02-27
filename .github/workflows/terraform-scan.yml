@@ -12,23 +12,24 @@ permissions:
   security-events: write
 
 jobs:
-  tfsec:
-    name: Run tfsec on PR
+  trivy-terraform-scan:
+    name: Run Trivy IaC scan on PR
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Run tfsec
-        uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6 # v1.0.3
+      - name: Run Trivy IaC scan
+        uses: aquasecurity/trivy-action@v0
         with:
-          format: sarif
-          additional_args: --out tfsec.sarif
-          soft_fail: false
+          scan-type: 'fs'
+          scanners: 'misconfig'
+          format: 'sarif'
+          output: 'trivy.sarif'
 
-      - name: Upload tfsec SARIF
+      - name: Upload Trivy SARIF
         if: always() && github.event.pull_request.head.repo.full_name == github.repository
         uses: github/codeql-action/upload-sarif@c4a7bc332abaec03596ff2803dd7f3ca3a238975 # v3
         with:
-          sarif_file: tfsec.sarif
+          sarif_file: trivy.sarif
