@@ -10,7 +10,7 @@ terraform {
     }
     rancher2 = {
       source  = "rancher/rancher2"
-      version = "~> 3.0"
+      version = "~> 13.1"
     }
     tls = {
       source  = "hashicorp/tls"
@@ -156,7 +156,10 @@ resource "harvester_ippool" "rancher_ips" {
   }
 }
 
-# Note: The Helm and Rancher2 bootstrap logic below would fail because the Helm provider cannot dynamically access the Masquerade Kubeconfig.
-# Because the user explicitly pointed out their cloud-init script gracefully handled Helm inside Harvester, we will pivot to that!
-# The user's cloud-init handles cert-manager and rancher installations.
-# Therefore, Phase 1 and 2 will connect directly to the resulting Rancher URL.
+# Rancher is installed inside the VM by cloud-init (cert-manager + Helm).
+# rancher2_bootstrap waits for Rancher to be reachable and sets the permanent admin
+# password. Re-run `terraform apply` if Rancher is still starting up on first attempt.
+resource "rancher2_bootstrap" "admin" {
+  initial_password = var.bootstrap_password
+  password         = var.rancher_admin_password
+}
