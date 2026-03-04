@@ -56,9 +56,15 @@ variable "rancher_hostname" {
   description = "FQDN for the Rancher UI"
 }
 
+variable "bootstrap_password" {
+  type        = string
+  description = "Temporary password set by the Rancher Helm chart during cloud-init install"
+  sensitive   = true
+}
+
 variable "rancher_admin_password" {
   type        = string
-  description = "Bootstrap password for Rancher Admin user"
+  description = "Permanent admin password to configure on the Rancher instance"
   sensitive   = true
 }
 
