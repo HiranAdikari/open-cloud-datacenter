@@ -23,6 +23,12 @@ All contributors are expected to follow our [Code of Conduct](https://github.com
     *   Provide a clear description of your changes and the reason for them in the pull request.
     *   For more information, refer to [https://wso2.github.io/](https://wso2.github.io/)
 
+## Code Quality and Linting
+
+All pull requests are automatically checked by [super-linter](https://github.com/super-linter/super-linter), which runs multiple linters including Checkov, TFLint, Terrascan, ShellCheck, and more.
+
+For information on linter configuration and how to suppress false positives, see the [Linter Configuration Guide](../.github/linters/README.md).
+
 ## Good First Issues
 
 If you're new to the project, look for issues tagged with `Good First Issue`. These are well-defined and perfect for becoming familiar with the codebase.
