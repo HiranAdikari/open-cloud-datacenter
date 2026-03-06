@@ -1,10 +1,10 @@
 locals {
-  base_url             = "https://api.asgardeo.io/t/${var.org_name}"
-  issuer_url           = "${local.base_url}/oauth2/token"
-  auth_endpoint        = "${local.base_url}/oauth2/authorize"
-  token_endpoint       = "${local.base_url}/oauth2/token"
-  jwks_url             = "${local.base_url}/oauth2/jwks"
-  discovery_url        = "${local.base_url}/oauth2/token/.well-known/openid-configuration"
+  base_url       = "https://api.asgardeo.io/t/${var.org_name}"
+  issuer_url     = "${local.base_url}/oauth2/token"
+  auth_endpoint  = "${local.base_url}/oauth2/authorize"
+  token_endpoint = "${local.base_url}/oauth2/token"
+  jwks_url       = "${local.base_url}/oauth2/jwks"
+  discovery_url  = "${local.base_url}/oauth2/token/.well-known/openid-configuration"
 }
 
 resource "asgardeo_application" "this" {

@@ -82,7 +82,7 @@ See [docs/architecture.md](docs/architecture.md) for a detailed breakdown.
 
 ## Reporting Product Issues
 
-*   **GitHub Issues**: [Report bugs or request features](https://github.com/wso2/open-cloud-datacenter/issues)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/wso2/open-cloud-datacenter/issues)
 
 ---
 

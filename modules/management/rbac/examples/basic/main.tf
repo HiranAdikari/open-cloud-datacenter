@@ -21,7 +21,7 @@ terraform {
 }
 
 provider "rancher2" {
-  api_url   = "https://rancher.example.internal"
+  api_url = "https://rancher.example.internal"
   # Provide credentials via environment variables:
   # CATTLE_ACCESS_KEY / CATTLE_SECRET_KEY
   # or via the access_key / secret_key arguments.
