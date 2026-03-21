@@ -486,7 +486,7 @@ resource "kubernetes_manifest" "prometheus_rule_storage" {
             },
             {
               alert  = "LonghornEvictionWithDegradedVolumes"
-              expr   = "longhorn_disk_eviction_requested == 1"
+              expr   = "longhorn_disk_eviction_requested == 1 and on() count(longhorn_volume_robustness{robustness=\"degraded\"}) > 0"
               for    = "5m"
               labels = { severity = "critical" }
               annotations = {
