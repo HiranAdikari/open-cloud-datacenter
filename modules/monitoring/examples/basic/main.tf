@@ -28,10 +28,10 @@ provider "kubernetes" {
 }
 
 module "monitoring" {
-  source = "github.com/wso2-enterprise/open-cloud-datacenter//modules/monitoring?ref=v0.3.0"
+  source = "../../"
 
   # Identifiers
-  environment        = "lk"
+  environment        = var.environment
   kubeconfig_path    = var.kubeconfig_path
   kubeconfig_context = var.kubeconfig_context
 
@@ -59,6 +59,11 @@ output "monitoring_resources" {
     prometheus_rule_node    = module.monitoring.prometheus_rule_node_name
     alertmanager_config     = module.monitoring.alertmanager_config_name
   }
+}
+
+variable "environment" {
+  type        = string
+  description = "Short environment identifier used in resource names (e.g. \"lk\")."
 }
 
 variable "kubeconfig_path" {
