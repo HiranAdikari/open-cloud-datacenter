@@ -1,62 +1,83 @@
 variable "cluster_name" {
   type        = string
-  description = "The name of the K8s cluster to provision"
+  description = "Name of the downstream RKE2 cluster in Rancher"
 }
 
-variable "k8s_version" {
+variable "kubernetes_version" {
   type        = string
-  description = "The RKE2 Kubernetes version (e.g., v1.27.6+rke2r1)"
-  default     = "v1.27.6+rke2r1"
+  description = "RKE2 Kubernetes version (e.g. v1.32.13+rke2r1)"
 }
 
-variable "node_count" {
-  type        = number
-  description = "Number of control-plane/worker hybrid nodes"
-  default     = 3
-}
-
-variable "cloud_credential_name" {
+variable "cloud_credential_id" {
   type        = string
-  description = "Name of the Harvester cloud credential in Rancher"
-  default     = "harvester-creds"
+  sensitive   = true
+  description = "Harvester cloud credential secret name (cattle-global-data:cc-xxxx)"
 }
 
-variable "harvester_namespace" {
+variable "cni" {
   type        = string
-  description = "Namespace in Harvester to deploy the VMs"
-  default     = "default"
+  description = "CNI plugin for the cluster"
+  default     = "cilium"
 }
 
-variable "harvester_image_name" {
-  type        = string
-  description = "Harvester image name for the base OS (e.g., default/ubuntu-22.04)"
+# ── Machine pools ─────────────────────────────────────────────────────────────
+# Each entry produces one rancher2_machine_config_v2 + one pool in the cluster.
+# Use a single combined pool for small clusters; separate control-plane / worker
+# entries for larger ones.
+variable "machine_pools" {
+  type = list(object({
+    name          = string
+    vm_namespace  = string
+    quantity      = number
+    cpu_count     = string        # string expected by Harvester API e.g. "4"
+    memory_size   = string        # GiB as string e.g. "12"
+    disk_size     = number        # GiB as integer
+    image_name    = string        # "namespace/image-id"
+    networks      = list(string)  # ["ns/nad", "iaas/storage-network", ...]
+    control_plane = bool
+    etcd          = bool
+    worker        = bool
+  }))
 }
 
-variable "harvester_network_name" {
+# ── Node cloud-init ───────────────────────────────────────────────────────────
+variable "user_data" {
   type        = string
-  description = "Harvester network name (e.g., default/vlan-100)"
-}
-
-variable "node_cpu" {
-  type        = string
-  description = "CPU string (e.g., '4')"
-  default     = "4"
-}
-
-variable "node_memory" {
-  type        = string
-  description = "Memory string (e.g., '16Gi')"
-  default     = "16"
-}
-
-variable "node_disk_size" {
-  type        = string
-  description = "Disk size string (e.g., '100Gi')"
-  default     = "100"
+  sensitive   = true
+  description = "cloud-init user-data applied to every node VM (plain YAML or base64)"
+  default     = ""
 }
 
 variable "ssh_user" {
   type        = string
   description = "SSH username for the VM OS"
   default     = "ubuntu"
+}
+
+# ── Harvester cloud provider ──────────────────────────────────────────────────
+variable "cloud_provider_config_secret" {
+  type        = string
+  description = "Secret name for Harvester cloud-provider-config, without namespace prefix (just the secret name part after 'fleet-default:'). Leave empty to skip."
+  default     = ""
+}
+
+# ── Brownfield skip flag ──────────────────────────────────────────────────────
+variable "manage_rke_config" {
+  type        = bool
+  description = "Create/manage machine configs and rke_config block. Set false for brownfield clusters where machine configs cannot be imported."
+  default     = true
+}
+
+# ── etcd S3 backup (optional) ─────────────────────────────────────────────────
+variable "etcd_s3" {
+  type = object({
+    bucket              = string
+    folder              = string
+    region              = string
+    cloud_credential_id = string
+    snapshot_retention  = optional(number, 3)
+    snapshot_schedule   = optional(string, "5 23 * * *")
+  })
+  default     = null
+  description = "S3 etcd backup config. Set to null to disable."
 }

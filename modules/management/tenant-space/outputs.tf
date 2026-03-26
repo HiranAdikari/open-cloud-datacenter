@@ -8,12 +8,7 @@ output "project_name" {
   description = "Rancher project name."
 }
 
-output "namespace_id" {
-  value       = rancher2_namespace.this.id
-  description = "ID of the primary namespace created within the project."
-}
-
-output "namespace_name" {
-  value       = rancher2_namespace.this.name
-  description = "Name of the primary namespace."
+output "namespace_ids" {
+  value       = { for ns, r in rancher2_namespace.this : ns => r.id }
+  description = "Map of namespace name → Rancher namespace ID for each namespace in the project."
 }

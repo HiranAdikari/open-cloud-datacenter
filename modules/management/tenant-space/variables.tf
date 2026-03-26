@@ -5,31 +5,35 @@ variable "cluster_id" {
 
 variable "project_name" {
   type        = string
-  description = "Name of the Rancher project for this tenant (lowercase, hyphen-separated)."
+  description = "Name of the Rancher project for this tenant."
 }
 
-variable "namespace_name" {
-  type        = string
-  description = "Namespace to create within the project. Defaults to <project_name>-ns."
-  default     = null
+variable "namespaces" {
+  type        = list(string)
+  description = "Namespaces to create within the project."
+  default     = []
 }
 
-# Resource quotas — applied to both the project aggregate and the per-namespace default.
-# Adjust namespace_* overrides if the project spans multiple namespaces.
+# Resource quotas — all optional. Omit entirely for projects with no quota enforcement.
+# When set, the same limits apply at both project aggregate and per-namespace default
+# level unless namespace_* overrides are provided.
 
 variable "cpu_limit" {
   type        = string
-  description = "Total CPU limit for the project (e.g. \"8\", \"500m\")."
+  description = "Total CPU limit for the project (e.g. \"8\", \"500m\"). Null skips quota entirely."
+  default     = null
 }
 
 variable "memory_limit" {
   type        = string
   description = "Total memory limit for the project (e.g. \"16Gi\", \"4096Mi\")."
+  default     = null
 }
 
 variable "storage_limit" {
   type        = string
   description = "Total persistent storage request limit for the project (e.g. \"200Gi\")."
+  default     = null
 }
 
 variable "namespace_cpu_limit" {
@@ -69,8 +73,8 @@ variable "group_role_bindings" {
     Example:
       group_role_bindings = [
         { group_principal_id = "openid://my-oidc-group", role_template_id = "project-member" },
-        { group_principal_id = "openid://my-oidc-group", role_template_id = module.cluster_roles.vm_metrics_observer_role_id },
+        { group_principal_id = "openid://my-oidc-group", role_template_id = module.cluster_roles.vm_manager_role_id },
       ]
   EOT
-  default = []
+  default     = []
 }
