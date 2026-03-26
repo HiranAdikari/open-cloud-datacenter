@@ -13,7 +13,7 @@
 #   - The rancher2 provider configured with your Rancher URL and access key
 
 terraform {
-  required_version = ">= 1.3"
+  required_version = ">= 1.7"
 
   required_providers {
     rancher2 = {
@@ -30,20 +30,28 @@ provider "rancher2" {
 }
 
 module "tenant_cluster" {
-  source = "github.com/wso2-enterprise/open-cloud-datacenter//modules/workloads/k8s-cluster?ref=v0.1.0"
+  source = "github.com/wso2-enterprise/open-cloud-datacenter//modules/workloads/k8s-cluster?ref=v0.2.0"
 
-  cluster_name          = "tenant-alpha"
-  k8s_version           = "v1.27.6+rke2r1"
-  node_count            = 3
-  cloud_credential_name = "harvester-local-creds"
-  harvester_namespace   = "default"
+  cluster_name        = "tenant-alpha"
+  kubernetes_version  = "v1.32.13+rke2r1"
+  cloud_credential_id = "cattle-global-data:cc-xxxx"
 
   # Reference the image and network created by the storage and networking modules
-  harvester_image_name   = "default/ubuntu-22-04"
-  harvester_network_name = "default/vlan-tenants"
+  machine_pools = [
+    {
+      name          = "pool1"
+      vm_namespace  = "default"
+      quantity      = 3
+      cpu_count     = "4"
+      memory_size   = "16"
+      disk_size     = 100
+      image_name    = "default/ubuntu-22-04"
+      networks      = ["default/vlan-tenants", "iaas/storage-network"]
+      control_plane = true
+      etcd          = true
+      worker        = true
+    }
+  ]
 
-  node_cpu       = "4"
-  node_memory    = "16"
-  node_disk_size = "100"
-  ssh_user       = "ubuntu"
+  ssh_user = "ubuntu"
 }

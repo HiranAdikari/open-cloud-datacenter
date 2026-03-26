@@ -12,8 +12,12 @@ variable "namespaces" {
   type        = list(string)
   description = "One or more Kubernetes namespace names to create within the project. Must contain at least one unique entry."
   validation {
-    condition     = length(var.namespaces) > 0 && length(var.namespaces) == length(toset(var.namespaces))
-    error_message = "At least one namespace must be specified, and all namespace names must be unique."
+    condition = (
+      length(var.namespaces) > 0 &&
+      length(var.namespaces) == length(toset(var.namespaces)) &&
+      alltrue([for ns in var.namespaces : trimspace(ns) != ""])
+    )
+    error_message = "At least one non-empty namespace must be specified, and all namespace names must be unique."
   }
 }
 
@@ -25,36 +29,60 @@ variable "cpu_limit" {
   type        = string
   description = "Total CPU limit for the project (e.g. \"8\", \"500m\"). Null skips quota entirely."
   default     = null
+  validation {
+    condition     = var.cpu_limit == null || trimspace(var.cpu_limit) != ""
+    error_message = "cpu_limit must be null or a non-empty quantity string."
+  }
 }
 
 variable "memory_limit" {
   type        = string
   description = "Total memory limit for the project (e.g. \"16Gi\", \"4096Mi\"). Only applied when cpu_limit is set."
   default     = null
+  validation {
+    condition     = var.memory_limit == null || trimspace(var.memory_limit) != ""
+    error_message = "memory_limit must be null or a non-empty quantity string."
+  }
 }
 
 variable "storage_limit" {
   type        = string
   description = "Total persistent storage request limit for the project (e.g. \"200Gi\"). Only applied when cpu_limit is set."
   default     = null
+  validation {
+    condition     = var.storage_limit == null || trimspace(var.storage_limit) != ""
+    error_message = "storage_limit must be null or a non-empty quantity string."
+  }
 }
 
 variable "namespace_cpu_limit" {
   type        = string
   description = "Per-namespace default CPU limit. Defaults to cpu_limit."
   default     = null
+  validation {
+    condition     = var.namespace_cpu_limit == null || trimspace(var.namespace_cpu_limit) != ""
+    error_message = "namespace_cpu_limit must be null or a non-empty quantity string."
+  }
 }
 
 variable "namespace_memory_limit" {
   type        = string
   description = "Per-namespace default memory limit. Defaults to memory_limit."
   default     = null
+  validation {
+    condition     = var.namespace_memory_limit == null || trimspace(var.namespace_memory_limit) != ""
+    error_message = "namespace_memory_limit must be null or a non-empty quantity string."
+  }
 }
 
 variable "namespace_storage_limit" {
   type        = string
   description = "Per-namespace default storage limit. Defaults to storage_limit."
   default     = null
+  validation {
+    condition     = var.namespace_storage_limit == null || trimspace(var.namespace_storage_limit) != ""
+    error_message = "namespace_storage_limit must be null or a non-empty quantity string."
+  }
 }
 
 # Role bindings — one binding is created per (group, role) pair.
