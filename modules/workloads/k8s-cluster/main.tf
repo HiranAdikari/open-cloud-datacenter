@@ -8,44 +8,119 @@ terraform {
   }
 }
 
-# 1. Fetch the Cloud Credential for Harvester
-data "rancher2_cloud_credential" "harvester" {
-  name = var.cloud_credential_name
+locals {
+  pools_by_name = { for p in var.machine_pools : p.name => p }
 }
 
-# 2. Define the Machine Config (VM sizing and settings on Harvester)
-resource "rancher2_machine_config_v2" "harvester_nodes" {
-  generate_name = "${var.cluster_name}-machine-config"
+# One machine config per pool.
+# rancher2_machine_config_v2 does not support import — set manage_rke_config = false
+# for brownfield clusters where machine configs already exist.
+resource "rancher2_machine_config_v2" "pool" {
+  for_each = var.manage_rke_config ? local.pools_by_name : {}
+
+  generate_name = "${var.cluster_name}-${each.key}"
 
   harvester_config {
-    vm_namespace = var.harvester_namespace
-    cpu_count    = var.node_cpu
-    memory_size  = var.node_memory
-    disk_size    = var.node_disk_size
-    disk_bus     = "virtio"
-    image_name   = var.harvester_image_name
-    network_name = var.harvester_network_name
-    ssh_user     = var.ssh_user
+    vm_namespace         = each.value.vm_namespace
+    cpu_count            = each.value.cpu_count
+    memory_size          = each.value.memory_size
+    reserved_memory_size = "-1"
+    ssh_user             = var.ssh_user
+    user_data            = var.user_data
+
+    disk_info = jsonencode({
+      disks = [{
+        imageName = each.value.image_name
+        bootOrder = 1
+        size      = each.value.disk_size
+      }]
+    })
+
+    network_info = jsonencode({
+      interfaces = [
+        for net in each.value.networks : {
+          networkName = net
+          macAddress  = ""
+        }
+      ]
+    })
   }
 }
 
-# 3. Provision the RKE2 Cluster using the Machine Config
-resource "rancher2_cluster_v2" "tenant_cluster" {
-  name               = var.cluster_name
-  kubernetes_version = var.k8s_version
+resource "rancher2_cluster_v2" "this" {
+  name                         = var.cluster_name
+  kubernetes_version           = var.kubernetes_version
+  cloud_credential_secret_name = var.cloud_credential_id
 
-  rke_config {
-    machine_pools {
-      name                         = "pool1"
-      cloud_credential_secret_name = data.rancher2_cloud_credential.harvester.id
-      control_plane_role           = true
-      etcd_role                    = true
-      worker_role                  = true
-      quantity                     = var.node_count
+  # rke_config and cloud_credential_secret_name are applied on CREATE but never
+  # modified by TF after that. This prevents provider-normalization diffs on
+  # brownfield-imported clusters and lets Rancher manage pool lifecycle directly.
+  lifecycle {
+    ignore_changes = [
+      rke_config,
+      cloud_credential_secret_name,
+      cluster_agent_deployment_customization,
+      fleet_agent_deployment_customization,
+    ]
+  }
 
-      machine_config {
-        kind = rancher2_machine_config_v2.harvester_nodes.kind
-        name = rancher2_machine_config_v2.harvester_nodes.name
+  dynamic "rke_config" {
+    for_each = var.manage_rke_config ? [1] : []
+    content {
+      machine_global_config = <<-YAML
+        cni: ${var.cni}
+        disable-kube-proxy: false
+        etcd-expose-metrics: false
+      YAML
+
+      dynamic "machine_selector_config" {
+        for_each = var.cloud_provider_config_secret != "" ? [1] : []
+        content {
+          # config is TypeString (YAML) in rancher2 v13.
+          config = yamlencode({
+            "cloud-provider-config"   = "secret://fleet-default:${var.cloud_provider_config_secret}"
+            "cloud-provider-name"     = "harvester"
+            "protect-kernel-defaults" = false
+          })
+        }
+      }
+
+      dynamic "machine_pools" {
+        for_each = local.pools_by_name
+        content {
+          name                         = machine_pools.key
+          cloud_credential_secret_name = var.cloud_credential_id
+          control_plane_role           = machine_pools.value.control_plane
+          etcd_role                    = machine_pools.value.etcd
+          worker_role                  = machine_pools.value.worker
+          quantity                     = machine_pools.value.quantity
+          drain_before_delete          = true
+
+          machine_config {
+            kind = rancher2_machine_config_v2.pool[machine_pools.key].kind
+            name = rancher2_machine_config_v2.pool[machine_pools.key].name
+          }
+        }
+      }
+
+      dynamic "etcd" {
+        for_each = var.etcd_s3 != null ? [var.etcd_s3] : []
+        content {
+          snapshot_retention     = etcd.value.snapshot_retention
+          snapshot_schedule_cron = etcd.value.snapshot_schedule
+          s3_config {
+            bucket                = etcd.value.bucket
+            cloud_credential_name = etcd.value.cloud_credential_id
+            endpoint              = "s3.${etcd.value.region}.amazonaws.com"
+            folder                = etcd.value.folder
+            region                = etcd.value.region
+          }
+        }
+      }
+
+      upgrade_strategy {
+        control_plane_concurrency = "1"
+        worker_concurrency        = "1"
       }
     }
   }
