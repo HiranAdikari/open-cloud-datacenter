@@ -34,7 +34,7 @@ module "monitoring" {
 
 ## Architecture
 
-```
+```text
 Prometheus (rancher-monitoring)
    │  evaluates PrometheusRule CRDs labelled release=rancher-monitoring
    ▼
@@ -253,7 +253,7 @@ A Google Chat card should appear within a few seconds.
 Each alert produces one card. The card structure is defined in a Go template
 stored in the `calert-config` Secret and rendered by calert at runtime.
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │ (WARNING) LonghornDiskUsageHigh | Firing             │  ← header
 ├─────────────────────────────────────────────────────┤
@@ -269,7 +269,7 @@ stored in the `calert-config` Secret and rendered by calert at runtime.
 
 **"View Alert" button** is only rendered when `alertmanager_url` is set. It
 links to:
-```
+```text
 <alertmanager_url>/#/alerts?filter={alertname="<name>"}
 ```
 
