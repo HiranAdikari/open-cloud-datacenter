@@ -46,9 +46,13 @@ variable "machine_pools" {
   validation {
     condition = length(var.machine_pools) == length(distinct([for p in var.machine_pools : p.name])) && alltrue([
       for p in var.machine_pools :
-      p.quantity > 0 && (p.control_plane || p.etcd || p.worker)
+      p.quantity > 0 &&
+      floor(p.quantity) == p.quantity &&
+      p.disk_size > 0 &&
+      floor(p.disk_size) == p.disk_size &&
+      (p.control_plane || p.etcd || p.worker)
     ])
-    error_message = "Each machine pool must have a unique name, a positive quantity, and at least one role (control_plane, etcd, or worker) enabled."
+    error_message = "Each machine pool must have a unique name, integer quantity/disk_size > 0, and at least one role (control_plane, etcd, or worker) enabled."
   }
 }
 
@@ -92,4 +96,15 @@ variable "etcd_s3" {
   })
   default     = null
   description = "S3 etcd backup config. Set to null to disable."
+
+  validation {
+    condition = var.etcd_s3 == null || (
+      trimspace(var.etcd_s3.bucket) != "" &&
+      trimspace(var.etcd_s3.region) != "" &&
+      trimspace(var.etcd_s3.cloud_credential_id) != "" &&
+      try(var.etcd_s3.snapshot_retention, 3) > 0 &&
+      trimspace(try(var.etcd_s3.snapshot_schedule, "")) != ""
+    )
+    error_message = "When etcd_s3 is set, bucket/region/cloud_credential_id must be non-empty, snapshot_retention must be > 0, and snapshot_schedule must be non-empty."
+  }
 }
