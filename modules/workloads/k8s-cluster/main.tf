@@ -15,8 +15,15 @@ locals {
 # One machine config per pool.
 # rancher2_machine_config_v2 does not support import — set manage_rke_config = false
 # for brownfield clusters where machine configs already exist.
+#
+# When changing machine config specs (cpu, memory, disk, image, network) on a
+# pool NOT covered by machine_config_overrides, the provider recreates this
+# resource with a new random name. The cluster resource cannot reference an
+# unknown name in a single plan, so a two-phase apply is required:
+#   Phase 1: terraform apply -target=module.<name>.rancher2_machine_config_v2.pool
+#   Phase 2: terraform apply -target=module.<name>
 resource "rancher2_machine_config_v2" "pool" {
-  for_each = var.manage_rke_config ? local.pools_by_name : {}
+  for_each = var.manage_rke_config ? { for k, v in local.pools_by_name : k => v if !contains(keys(var.machine_config_overrides), k) } : {}
 
   generate_name = "${var.cluster_name}-${each.key}"
 
@@ -64,10 +71,12 @@ resource "rancher2_cluster_v2" "this" {
   # ignore_changes cannot be scoped to manage_rke_config = false only.
   lifecycle {
     ignore_changes = [
-      rke_config,
       cloud_credential_secret_name,
       cluster_agent_deployment_customization,
       fleet_agent_deployment_customization,
+      rke_config[0].chart_values,
+      rke_config[0].upgrade_strategy[0].control_plane_drain_options,
+      rke_config[0].upgrade_strategy[0].worker_drain_options,
     ]
     precondition {
       condition     = !var.manage_rke_config || length(var.machine_pools) > 0
@@ -78,7 +87,7 @@ resource "rancher2_cluster_v2" "this" {
   dynamic "rke_config" {
     for_each = var.manage_rke_config ? [1] : []
     content {
-      machine_global_config = <<-YAML
+      machine_global_config = var.machine_global_config != null ? var.machine_global_config : <<-YAML
         cni: ${var.cni}
         disable-kube-proxy: false
         etcd-expose-metrics: false
@@ -108,8 +117,8 @@ resource "rancher2_cluster_v2" "this" {
           drain_before_delete          = true
 
           machine_config {
-            kind = rancher2_machine_config_v2.pool[machine_pools.key].kind
-            name = rancher2_machine_config_v2.pool[machine_pools.key].name
+            kind = contains(keys(var.machine_config_overrides), machine_pools.key) ? var.machine_config_overrides[machine_pools.key].kind : rancher2_machine_config_v2.pool[machine_pools.key].kind
+            name = contains(keys(var.machine_config_overrides), machine_pools.key) ? var.machine_config_overrides[machine_pools.key].name : rancher2_machine_config_v2.pool[machine_pools.key].name
           }
         }
       }
@@ -125,6 +134,29 @@ resource "rancher2_cluster_v2" "this" {
             endpoint              = "s3.${etcd.value.region}.amazonaws.com"
             folder                = etcd.value.folder
             region                = etcd.value.region
+          }
+        }
+      }
+
+      dynamic "registries" {
+        for_each = var.registries != null ? [var.registries] : []
+        content {
+          dynamic "configs" {
+            for_each = registries.value.configs
+            content {
+              hostname                = configs.value.hostname
+              auth_config_secret_name = configs.value.auth_config_secret_name
+              insecure                = configs.value.insecure
+              tls_secret_name         = configs.value.tls_secret_name
+              ca_bundle               = configs.value.ca_bundle
+            }
+          }
+          dynamic "mirrors" {
+            for_each = registries.value.mirrors
+            content {
+              hostname  = mirrors.value.hostname
+              endpoints = mirrors.value.endpoints
+            }
           }
         }
       }
