@@ -20,6 +20,30 @@ variable "cni" {
   default     = "cilium"
 }
 
+variable "machine_global_config" {
+  type        = string
+  description = "Full machine_global_config YAML for the cluster. When null the module generates a default from the cni variable. Override to add extra args such as kube-proxy-arg."
+  default     = null
+}
+
+variable "registries" {
+  type = object({
+    configs = optional(list(object({
+      hostname                = string
+      auth_config_secret_name = optional(string)
+      insecure                = optional(bool, false)
+      tls_secret_name         = optional(string)
+      ca_bundle               = optional(string)
+    })), [])
+    mirrors = optional(list(object({
+      hostname  = string
+      endpoints = list(string)
+    })), [])
+  })
+  description = "Private registry configurations for the cluster. Set to null to configure no registries."
+  default     = null
+}
+
 # ── Machine pools ─────────────────────────────────────────────────────────────
 # Each entry produces one rancher2_machine_config_v2 + one pool in the cluster.
 # Use a single combined pool for small clusters; separate control-plane / worker
@@ -82,6 +106,15 @@ variable "manage_rke_config" {
   type        = bool
   description = "Create/manage machine configs and rke_config block. Set false for brownfield clusters where machine configs cannot be imported."
   default     = true
+}
+
+variable "machine_config_overrides" {
+  type = map(object({
+    kind = string
+    name = string
+  }))
+  description = "Existing machine config kind/name keyed by pool name. When a pool name is present here, no rancher2_machine_config_v2 is created for it and the provided kind/name are used directly. Use this for brownfield pools whose machine configs already exist in Rancher and cannot be imported."
+  default     = {}
 }
 
 # ── etcd S3 backup (optional) ─────────────────────────────────────────────────
