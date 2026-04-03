@@ -17,6 +17,30 @@ locals {
   machine_selector_config = var.cloud_provider_config_secret != "" ? (
     "cloud-provider-config: secret://fleet-default:${var.cloud_provider_config_secret}\ncloud-provider-name: harvester\nprotect-kernel-defaults: false\n"
   ) : "cloud-provider-name: harvester\nprotect-kernel-defaults: false\n"
+
+  # Map of registry configs that carry inline credentials (username set).
+  # Keyed by hostname so each host gets one secret regardless of insecure/tls settings.
+  registry_auth_configs = {
+    for c in try(var.registries.configs, []) : c.hostname => c
+    if c.username != null
+  }
+}
+
+# Registry auth secrets — created only for configs that supply username/password.
+# Stored in fleet-default (same namespace as harvester cloud credential secrets)
+# so the RKE2 provisioner can read them during cluster bring-up.
+resource "rancher2_secret_v2" "registry_auth" {
+  for_each = local.registry_auth_configs
+
+  cluster_id = "local"
+  name       = "${var.cluster_name}-registry-${replace(replace(each.key, ".", "-"), "/", "-")}"
+  namespace  = "fleet-default"
+  type       = "kubernetes.io/basic-auth"
+
+  data = {
+    username = base64encode(each.value.username)
+    password = base64encode(each.value.password)
+  }
 }
 
 # One machine config per pool.
@@ -174,11 +198,13 @@ resource "rancher2_cluster_v2" "this" {
           dynamic "configs" {
             for_each = registries.value.configs
             content {
-              hostname                = configs.value.hostname
-              auth_config_secret_name = configs.value.auth_config_secret_name
-              insecure                = configs.value.insecure
-              tls_secret_name         = configs.value.tls_secret_name
-              ca_bundle               = configs.value.ca_bundle
+              hostname = configs.value.hostname
+              insecure = configs.value.insecure
+              ca_bundle       = configs.value.ca_bundle
+              tls_secret_name = configs.value.tls_secret_name
+              auth_config_secret_name = configs.value.username != null ? (
+                rancher2_secret_v2.registry_auth[configs.value.hostname].name
+              ) : configs.value.auth_config_secret_name
             }
           }
           dynamic "mirrors" {
