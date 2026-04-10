@@ -53,13 +53,12 @@ variable "disk_size" {
 
 variable "uplink_network_name" {
   type        = string
-  description = "Full Harvester network ref for eth0 (the DigiOps/uplink NIC), e.g. 'default/vm-net-100'."
+  description = "Full Harvester network ref for eth0 (the external uplink NIC), e.g. 'default/uplink-network'."
 }
 
 variable "cluster_network_name" {
   type        = string
-  description = "Harvester cluster network name for eth1 (the trunk NIC that carries tenant VLANs). Must be a trunk-capable cluster network, e.g. 'vm-network'."
-  default     = "vm-network"
+  description = "Harvester cluster network name for eth1 (the trunk NIC that carries tenant VLANs). Must be a trunk-capable cluster network."
 }
 
 variable "trunk_network_namespace" {
