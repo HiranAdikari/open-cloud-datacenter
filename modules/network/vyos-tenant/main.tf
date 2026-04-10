@@ -37,6 +37,13 @@ locals {
   vif_path   = "interfaces ethernet eth1 vif ${var.vlan_id}"
 }
 
+check "dhcp_offset_order" {
+  assert {
+    condition     = var.dhcp_range_start_offset <= var.dhcp_range_end_offset
+    error_message = "dhcp_range_start_offset (${var.dhcp_range_start_offset}) must be less than or equal to dhcp_range_end_offset (${var.dhcp_range_end_offset})."
+  }
+}
+
 # ── VyOS configuration via HTTPS REST API ─────────────────────────────────────
 
 # eth1.vlan_id sub-interface — tenant gateway
@@ -55,10 +62,10 @@ resource "vyos_config_block_tree" "dhcp" {
 
   configs = {
     # subnet-id equals vlan_id — traceable 1:1 mapping
-    "subnet ${local.subnet} subnet-id"                 = tostring(var.vlan_id)
-    "subnet ${local.subnet} option default-router"     = local.gateway_ip
-    "subnet ${local.subnet} range 0 start"             = local.dhcp_start
-    "subnet ${local.subnet} range 0 stop"              = local.dhcp_stop
+    "subnet ${local.subnet} subnet-id"             = tostring(var.vlan_id)
+    "subnet ${local.subnet} option default-router" = local.gateway_ip
+    "subnet ${local.subnet} range 0 start"         = local.dhcp_start
+    "subnet ${local.subnet} range 0 stop"          = local.dhcp_stop
   }
 
   depends_on = [vyos_config_block_tree.vif]
