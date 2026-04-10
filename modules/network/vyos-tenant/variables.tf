@@ -64,6 +64,5 @@ variable "network_namespace" {
 
 variable "cluster_network_name" {
   type        = string
-  description = "Harvester cluster network name carrying the tenant VLANs, e.g. 'vm-network'."
-  default     = "vm-network"
+  description = "Harvester cluster network name carrying the tenant VLANs. Must match the cluster network used by the VyOS eth1 trunk."
 }

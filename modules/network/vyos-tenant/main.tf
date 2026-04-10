@@ -5,19 +5,19 @@
 # again with a different vlan_id.
 #
 # IPAM:
-#   subnet   = cidrsubnet("10.0.0.0/8", 15, vlan_id - 1000)
-#   gateway  = cidrhost(subnet, 1)          → e.g. 10.0.0.1 for VLAN 1000
-#   subnet-id = vlan_id                     → stable, traceable key
+#   subnet    = cidrsubnet("10.0.0.0/8", 15, vlan_id - 1000)
+#   gateway   = cidrhost(subnet, 1)   e.g. 10.0.0.1 for VLAN 1000
+#   subnet-id = vlan_id               stable, traceable 1:1 key
 #
 # Prerequisites:
-#   1. VyOS installed from ISO and rebooted (bootstrap module phase 2 complete)
+#   1. VyOS installed from ISO and rebooted (bootstrap module, phase 2)
 #   2. VyOS HTTPS API enabled manually post-install:
 #        configure
 #        set service https api keys id terraform key '<api_key>'
 #        set service https api allow-client address 0.0.0.0/0
 #        set service https certificates system-generated-certificate
 #        commit; save
-#   3. VyOS eth0 and static route configured (see VYOS-CONFIG-REFERENCE.md)
+#   3. VyOS uplink interface (eth0) and default route configured
 # ─────────────────────────────────────────────────────────────────────────────
 
 locals {
@@ -77,7 +77,7 @@ resource "vyos_config_block_tree" "dhcp_dns" {
   depends_on = [vyos_config_block_tree.dhcp]
 }
 
-# NAT source rule — masquerade tenant traffic out eth0 (internet egress)
+# NAT source rule — masquerade tenant traffic out the uplink interface (internet egress)
 # Rule number = vlan_id for traceability
 resource "vyos_config_block_tree" "nat_egress" {
   path = "nat source rule ${var.vlan_id}"

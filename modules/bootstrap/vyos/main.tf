@@ -1,6 +1,10 @@
 # ── VyOS bootstrap module ─────────────────────────────────────────────────────
 #
-# Deploys the VyOS gateway VM on Harvester. Designed for a two-apply workflow:
+# Deploys a VyOS gateway VM on Harvester with two NICs:
+#   eth0 — uplink to external network (static IP set manually post-install)
+#   eth1 — trunk port for tenant VLANs (VyOS manages 802.1Q vif sub-interfaces)
+#
+# Two-apply workflow required (VyOS only ships as ISO; no cloud-init qcow2):
 #
 #   Apply 1 (iso_installed = false):
 #     - Creates image, trunk network, and VM with ISO CDROM (boot_order=1)
@@ -11,10 +15,10 @@
 #     - Removes the CDROM disk; rootdisk becomes the sole boot device
 #     - VM restarts from installed disk
 #
-#   After Apply 2: use the vyos-tenant module (REST API) for configuration.
+#   After Apply 2: use the vyos-tenant module to configure VyOS via REST API.
 #
-# VyOS does not ship qemu-guest-agent — the VM IP will not appear in Harvester
-# UI. Use the known static IP configured post-install on eth0.
+# Note: VyOS does not ship qemu-guest-agent — VM IP will not appear in the
+# Harvester UI. Use the static IP set manually on eth0 post-install.
 # ─────────────────────────────────────────────────────────────────────────────
 
 locals {
@@ -42,8 +46,7 @@ resource "harvester_image" "vyos" {
 # to VyOS, which handles 802.1Q sub-interfaces (vif) per tenant VLAN.
 #
 # route_mode = "manual" is required by the Harvester provider when route_cidr
-# is specified. The CIDR here is informational only; routing is done by VyOS.
-# Using 0.0.0.0/0 to indicate "all tenant subnets pass through this trunk".
+# is specified. The CIDR is informational only; routing is handled by VyOS.
 
 resource "harvester_network" "eth1_trunk" {
   name                 = local.trunk_network_name
@@ -66,7 +69,7 @@ resource "harvester_virtualmachine" "vyos" {
   run_strategy         = "RerunOnFailure"
   machine_type         = "q35"
 
-  # eth0 — DigiOps/uplink NIC (VLAN 700). Static IP configured post-install.
+  # eth0 — uplink NIC. Static IP set manually post-install.
   network_interface {
     name         = "eth0"
     type         = "bridge"
