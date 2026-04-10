@@ -54,4 +54,12 @@ resource "harvester_virtualmachine" "this" {
       network_data = var.network_data
     }
   }
+
+  lifecycle {
+    ignore_changes = [
+      # cloud-init runs only on first boot; template changes after provisioning
+      # have no effect and should not trigger a VM restart.
+      cloudinit,
+    ]
+  }
 }
