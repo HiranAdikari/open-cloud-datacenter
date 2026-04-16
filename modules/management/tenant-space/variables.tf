@@ -11,7 +11,8 @@ variable "project_name" {
 variable "namespaces" {
   type        = list(string)
   description = "Kubernetes namespace names to create within the project. Defaults to [project_name] — a single namespace matching the project. Pass additional names to create more."
-  default     = null  validation {
+  default     = null
+  validation {
     condition = var.namespaces == null || (
       length(var.namespaces) > 0 &&
       length(var.namespaces) == length(toset(var.namespaces)) &&
