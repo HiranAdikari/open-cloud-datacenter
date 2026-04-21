@@ -36,18 +36,22 @@ resource "kubernetes_cluster_role_v1" "provisioner" {
   }
 
   # Create/patch/delete RoleBindings in any namespace.
+  # escalate is required so the provisioner can create RoleBindings that grant
+  # permissions it doesn't itself hold (e.g. the built-in view ClusterRole for
+  # the net-read binding). Without escalate, Kubernetes blocks the creation as
+  # an RBAC escalation attempt.
   rule {
     api_groups = ["rbac.authorization.k8s.io"]
     resources  = ["rolebindings"]
-    verbs      = ["get", "create", "patch", "update", "delete"]
+    verbs      = ["get", "create", "patch", "update", "delete", "escalate"]
   }
 
-  # Needed to create RoleBindings that reference the Harvester cloud provider ClusterRole.
+  # Needed to create RoleBindings that reference ClusterRoles. bind allows
+  # referencing a specific ClusterRole without holding all its permissions.
   rule {
-    api_groups     = ["rbac.authorization.k8s.io"]
-    resources      = ["clusterroles"]
-    resource_names = ["harvesterhci.io:cloudprovider"]
-    verbs          = ["bind"]
+    api_groups = ["rbac.authorization.k8s.io"]
+    resources  = ["clusterroles"]
+    verbs      = ["bind"]
   }
 }
 
