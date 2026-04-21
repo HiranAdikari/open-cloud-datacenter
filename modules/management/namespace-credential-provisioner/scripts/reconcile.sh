@@ -137,14 +137,7 @@ on_added_namespace() {
   local ns="$1" project_id="$2"
   local sa_name="harvester-cloud-provider-${ns}"
 
-  # Skip if SA token already exists — fully provisioned.
-  if kubectl get secret "${sa_name}-token" -n "$ns" \
-      -o jsonpath='{.data.token}' 2>/dev/null | grep -q .; then
-    log "  [ns] already provisioned: ${ns} — skipping"
-    return
-  fi
-
-  log "  [ns] provisioning SA for namespace: ${ns}"
+  log "  [ns] ensuring SA/RBAC for namespace: ${ns}"
 
   # ServiceAccount in tenant namespace.
   kubectl create serviceaccount "$sa_name" -n "$ns" \
@@ -244,8 +237,8 @@ on_added_cluster() {
     -o jsonpath='{.spec.rkeConfig.machinePools[0].machineConfigRef.name}' 2>/dev/null || true)
 
   if [[ -z "$machine_config_name" ]]; then
-    log "  [cluster] no machine config ref for ${cluster_name} — skipping"
-    return
+    log "  [cluster] no machine config ref for ${cluster_name} — will retry"
+    return 1
   fi
 
   vm_namespace=$(kubectl_rancher get harvesterconfigs.rke-machine-config.cattle.io \
@@ -253,8 +246,8 @@ on_added_cluster() {
     -o jsonpath='{.vmNamespace}' 2>/dev/null || true)
 
   if [[ -z "$vm_namespace" ]]; then
-    log "  [cluster] could not resolve vm_namespace for ${cluster_name} — skipping"
-    return
+    log "  [cluster] could not resolve vm_namespace for ${cluster_name} — will retry"
+    return 1
   fi
 
   # Only provision if we manage this namespace (SA token exists on Harvester).
@@ -325,9 +318,10 @@ namespace_watch_loop() {
         else
           [[ -z "$project_id" ]] && continue
           if ! grep -qxF "$ns" "$PROCESSED_NS_FILE" 2>/dev/null; then
-            echo "$ns" >> "$PROCESSED_NS_FILE"
             log "ADDED namespace: ${ns} (project: ${project_id})"
-            on_added_namespace "$ns" "$project_id"
+            if on_added_namespace "$ns" "$project_id"; then
+              echo "$ns" >> "$PROCESSED_NS_FILE"
+            fi
           fi
         fi
       done
@@ -387,9 +381,10 @@ cluster_watch_loop() {
         else
           [[ -z "$has_harvester" ]] && continue
           if ! grep -qxF "$cluster_name" "$PROCESSED_CLUSTERS_FILE" 2>/dev/null; then
-            echo "$cluster_name" >> "$PROCESSED_CLUSTERS_FILE"
             log "ADDED cluster: ${cluster_name}"
-            on_added_cluster "$cluster_name"
+            if on_added_cluster "$cluster_name"; then
+              echo "$cluster_name" >> "$PROCESSED_CLUSTERS_FILE"
+            fi
           fi
         fi
       done
@@ -411,9 +406,10 @@ kubectl get namespaces -o json | jq -r '
   [[ -z "$project_id" ]] && continue
   is_system_namespace "$ns" && continue
   [[ "$role" == "network-namespace" ]] && continue
-  echo "$ns" >> "$PROCESSED_NS_FILE"
   log "INIT namespace: ${ns} (project: ${project_id})"
-  on_added_namespace "$ns" "$project_id"
+  if on_added_namespace "$ns" "$project_id"; then
+    echo "$ns" >> "$PROCESSED_NS_FILE"
+  fi
 done
 
 log "Running initial cluster pass..."
@@ -433,16 +429,17 @@ kubectl_rancher get clusters.provisioning.cattle.io \
       .metadata.name
     ' \
   | while IFS= read -r cluster_name; do
-      echo "$cluster_name" >> "$PROCESSED_CLUSTERS_FILE"
       log "INIT cluster: ${cluster_name}"
-      on_added_cluster "$cluster_name"
+      if on_added_cluster "$cluster_name"; then
+        echo "$cluster_name" >> "$PROCESSED_CLUSTERS_FILE"
+      fi
     done
 
 log "Initial passes complete. Starting watch loops..."
 
 while true; do
   log "Starting namespace watch loop..."
-  namespace_watch_loop || true
+  namespace_watch_loop || log "Namespace watch loop exited with error (exit $?)"
   log "Namespace watch loop exited, restarting in 5s..."
   sleep 5
 done &
@@ -450,7 +447,7 @@ NAMESPACE_WATCH_PID=$!
 
 while true; do
   log "Starting cluster watch loop..."
-  cluster_watch_loop || true
+  cluster_watch_loop || log "Cluster watch loop exited with error (exit $?)"
   log "Cluster watch loop exited, restarting in 5s..."
   sleep 5
 done &
