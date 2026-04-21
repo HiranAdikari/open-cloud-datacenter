@@ -124,7 +124,7 @@ metadata:
     v2prov-authorized-secret-deletes-on-cluster-removal: "true"
     v2prov-secret-authorized-for-cluster: "${cluster_name}"
     platform.wso2.com/credential-source-namespace: "${vm_namespace}"
-type: secret
+type: Opaque
 stringData:
   credential: |
 $(echo "$kubeconfig" | sed 's/^/    /')
@@ -400,9 +400,11 @@ kubectl get namespaces -o json | jq -r '
   [
     .metadata.name,
     (.metadata.annotations["field.cattle.io/projectId"] // ""),
-    (.metadata.labels["platform.wso2.com/role"] // "")
+    (.metadata.labels["platform.wso2.com/role"] // ""),
+    (.metadata.deletionTimestamp // "")
   ] | join("\u0001")
-' | while IFS=$'\x01' read -r ns project_id role; do
+' | while IFS=$'\x01' read -r ns project_id role deletion_ts; do
+  [[ -n "$deletion_ts" ]] && continue
   [[ -z "$project_id" ]] && continue
   is_system_namespace "$ns" && continue
   [[ "$role" == "network-namespace" ]] && continue
