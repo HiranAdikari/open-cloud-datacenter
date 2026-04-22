@@ -120,6 +120,10 @@ variable "vlan_id" {
     )
     error_message = "vlan_id must be null or a non-empty list of valid 802.1Q VLAN IDs (1–4094)."
   }
+  validation {
+    condition     = var.vlan_id == null || length(var.vlan_id) == length(distinct(var.vlan_id))
+    error_message = "vlan_id must not contain duplicate VLAN IDs."
+  }
 }
 
 variable "network_namespace_name" {
@@ -136,6 +140,15 @@ variable "vlan_network_names" {
   type        = map(string)
   description = "Map of VLAN ID (as string) to harvester_network resource name override. Use when importing brownfield networks whose names differ from the default <project_name>-vlan<id> pattern. Example: { \"608\" = \"vm-subnet-008\" }."
   default     = {}
+  validation {
+    condition = alltrue([
+      for k, v in var.vlan_network_names :
+      can(regex("^[0-9]+$", k)) &&
+      tonumber(k) >= 1 && tonumber(k) <= 4094 &&
+      trimspace(v) != ""
+    ])
+    error_message = "vlan_network_names keys must be VLAN ID strings (1–4094) and values must be non-empty strings."
+  }
 }
 
 variable "cluster_network_name" {
@@ -168,6 +181,12 @@ variable "group_role_bindings" {
       ]
   EOT
   default     = []
+}
+
+variable "harvester_api_server" {
+  type        = string
+  description = "Direct Harvester kube-apiserver URL (port 6443, e.g. 'https://192.168.10.100:6443'). When set, a namespace-scoped ServiceAccount and kubeconfig are provisioned for the tenant. The kubeconfig is exposed via the vm_access_kubeconfig output and allows the tenant team to use the workloads/vm and workloads/k8s-cluster modules with the harvester provider. Requires kubernetes.harvester provider to be configured in the caller."
+  default     = null
 }
 
 variable "vyos_endpoint" {
