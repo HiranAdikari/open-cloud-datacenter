@@ -13,7 +13,7 @@ Provisions a tenant RKE2 Kubernetes cluster on Harvester HCI via Rancher's machi
 
 ```hcl
 module "my_rke2_cluster" {
-  source = "github.com/wso2/open-cloud-datacenter//modules/workloads/k8s-cluster?ref=v0.5.0"
+  source = "github.com/wso2/open-cloud-datacenter//modules/workloads/k8s-cluster?ref=v0.8.0"
 
   cluster_name        = "my-cluster"
   kubernetes_version  = "v1.32.13+rke2r1"
