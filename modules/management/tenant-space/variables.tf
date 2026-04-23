@@ -170,6 +170,12 @@ variable "group_role_bindings" {
   default     = []
 }
 
+variable "expose_vm_kubeconfig" {
+  type        = bool
+  description = "When true, reads the 'harvester-vm-kubeconfig' Secret created by the namespace-credential-provisioner and exposes it via the vm_access_kubeconfig output. Requires the kubernetes.harvester provider alias to be configured in the caller. The provisioner must have run before apply."
+  default     = false
+}
+
 variable "vyos_endpoint" {
   type        = string
   description = "VyOS HTTPS API endpoint (e.g. 'https://172.22.100.50'). Required when vlan_id is set."

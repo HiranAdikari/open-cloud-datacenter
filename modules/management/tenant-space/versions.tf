@@ -9,5 +9,10 @@ terraform {
       source  = "harvester/harvester"
       version = "~> 1.7"
     }
+    kubernetes = {
+      source                = "hashicorp/kubernetes"
+      version               = "~> 2.35"
+      configuration_aliases = [kubernetes.harvester]
+    }
   }
 }
