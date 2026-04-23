@@ -52,10 +52,17 @@ resource "local_sensitive_file" "consumer_kubeconfig" {
 }
 ```
 
-Or retrieve the kubeconfig directly from Terraform output:
+Or expose the kubeconfig as a root output and retrieve it:
+
+```hcl
+output "asgardeo_dev_kubeconfig" {
+  value     = module.asgardeo_vm_access.kubeconfig
+  sensitive = true
+}
+```
 
 ```bash
-terraform output -raw module.asgardeo_vm_access.kubeconfig > asgardeo-dev.kubeconfig.secret
+terraform output -raw asgardeo_dev_kubeconfig > asgardeo-dev.kubeconfig.secret
 ```
 
 ## Inputs
@@ -81,7 +88,8 @@ terraform output -raw module.asgardeo_vm_access.kubeconfig > asgardeo-dev.kubeco
 - The output kubeconfig contains a long-lived ServiceAccount token. Treat it as a secret.
   Do not commit it to version control. Write to a gitignored file or a secrets manager.
 - To rotate the credential: `terraform taint module.<name>.kubernetes_secret_v1.token`
-  then `terraform apply`. The old token is invalidated immediately on taint.
+  then `terraform apply`. Taint only marks the resource for replacement — the old token
+  remains valid until `terraform apply` deletes and recreates the Secret.
 - This module does **not** grant Rancher project access. The consumer still needs a Rancher
   API token (personal or M2M) for the `rancher2` provider, which the Rancher admin provisions
   separately via the Rancher UI.

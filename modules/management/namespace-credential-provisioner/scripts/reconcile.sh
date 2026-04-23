@@ -168,8 +168,14 @@ write_vm_kubeconfig() {
     --serviceaccount="${ns}:${sa_name}" \
     -n "$ns" --dry-run=client -o yaml | kubectl apply -f -
 
+  # RoleBinding — read shared OS images in default namespace.
+  kubectl create rolebinding "${ns}-${sa_name}-default-view" \
+    --clusterrole=view \
+    --serviceaccount="${ns}:${sa_name}" \
+    -n "default" --dry-run=client -o yaml | kubectl apply -f -
+
   # RoleBinding — read shared OS images in harvester-public.
-  kubectl create rolebinding "${sa_name}-public-view" \
+  kubectl create rolebinding "${ns}-${sa_name}-public-view" \
     --clusterrole=view \
     --serviceaccount="${ns}:${sa_name}" \
     -n "harvester-public" --dry-run=client -o yaml | kubectl apply -f -
@@ -294,7 +300,9 @@ EOF
   log "  [ns] SA ready: ${sa_name} in ${ns}"
 
   # Consumer VM-access kubeconfig — separate SA with broader permissions.
-  write_vm_kubeconfig "$ns" || log "  [ns] WARN: VM access kubeconfig failed for ${ns} (non-fatal)"
+  # Failure is propagated so the caller does NOT mark this namespace as processed;
+  # the watch loop will retry on the next event for this namespace.
+  write_vm_kubeconfig "$ns"
 }
 
 on_deleted_namespace() {
@@ -333,10 +341,12 @@ on_deleted_namespace() {
           && log "  [ns] deleted rolebinding ${rb_name_found} from ${rb_ns}"
       done || true
 
-  # Delete the VM-access SA's cross-namespace RoleBinding in harvester-public.
+  # Delete the VM-access SA's cross-namespace RoleBindings.
   # (Resources inside the deleted namespace are cleaned up by Kubernetes.)
   local vm_sa_name="harvester-vm-access-${ns}"
-  kubectl delete rolebinding "${vm_sa_name}-public-view" -n "harvester-public" \
+  kubectl delete rolebinding "${ns}-${vm_sa_name}-default-view" -n "default" \
+    2>/dev/null && log "  [ns] deleted default RoleBinding for ${vm_sa_name}" || true
+  kubectl delete rolebinding "${ns}-${vm_sa_name}-public-view" -n "harvester-public" \
     2>/dev/null && log "  [ns] deleted harvester-public RoleBinding for ${vm_sa_name}" || true
 }
 

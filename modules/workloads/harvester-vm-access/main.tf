@@ -79,7 +79,7 @@ resource "kubernetes_role_binding_v1" "harvester_edit" {
 resource "kubernetes_role_binding_v1" "image_read_default" {
   provider = kubernetes.harvester
   metadata {
-    name      = "${local.sa_name}-image-read"
+    name      = "${local.sa_name}-default-image-read"
     namespace = "default"
   }
   role_ref {
@@ -99,7 +99,7 @@ resource "kubernetes_role_binding_v1" "image_read_default" {
 resource "kubernetes_role_binding_v1" "image_read_public" {
   provider = kubernetes.harvester
   metadata {
-    name      = "${local.sa_name}-image-read"
+    name      = "${local.sa_name}-public-image-read"
     namespace = "harvester-public"
   }
   role_ref {

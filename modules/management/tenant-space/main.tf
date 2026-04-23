@@ -13,8 +13,11 @@ locals {
   # index. Only relevant when vyos_endpoint is set and exactly one VLAN is given.
   # Auto-routed environments (physical switch / DigiOps-issued VLANs) use multiple
   # VLANs with route_mode=auto; no explicit subnets needed.
-  use_vyos       = var.vlan_id != null && length(var.vlan_id) > 0 && var.vyos_endpoint != null
-  tenant_subnet  = local.use_vyos ? cidrsubnet("10.0.0.0/8", 15, var.vlan_id[0] - 1000) : null
+  use_vyos = var.vlan_id != null && length(var.vlan_id) > 0 && var.vyos_endpoint != null
+  # vlan_id[0] must be >= 1000 when VyOS is used — enforced by the precondition below.
+  # max(..., 0) prevents a negative cidrsubnet index from causing a plan-time panic
+  # before the precondition fires.
+  tenant_subnet  = local.use_vyos ? cidrsubnet("10.0.0.0/8", 15, max(var.vlan_id[0] - 1000, 0)) : null
   tenant_gateway = local.use_vyos ? cidrhost(local.tenant_subnet, 1) : null
 }
 
@@ -58,6 +61,10 @@ resource "rancher2_project" "this" {
     precondition {
       condition     = !local.use_vyos || length(var.vlan_id) == 1
       error_message = "VyOS path requires exactly one VLAN ID. Set vyos_endpoint = null for multi-VLAN auto-route configurations."
+    }
+    precondition {
+      condition     = !local.use_vyos || var.vlan_id[0] >= 1000
+      error_message = "VyOS IPAM uses VLAN IDs >= 1000 (index = vlan_id - 1000). Set vyos_endpoint = null for VLANs below 1000."
     }
   }
 }

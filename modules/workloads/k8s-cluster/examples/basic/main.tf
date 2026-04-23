@@ -32,12 +32,12 @@ provider "rancher2" {
 module "tenant_cluster" {
   source = "github.com/wso2/open-cloud-datacenter//modules/workloads/k8s-cluster?ref=v0.8.0"
 
-  cluster_name        = "tenant-alpha"
+  cluster_name        = local.cluster_name
   kubernetes_version  = "v1.32.13+rke2r1"
   cloud_credential_id = var.cloud_credential_id
 
   enable_harvester_cloud_provider = true
-  cloud_provider_config_secret    = "harvesterconfig-tenant-alpha"
+  cloud_provider_config_secret    = "harvesterconfig-${local.cluster_name}"
 
   machine_pools = [
     {
@@ -73,6 +73,7 @@ module "tenant_cluster" {
 }
 
 locals {
+  cluster_name   = "tenant-alpha"
   node_user_data = <<-EOT
     #cloud-config
     packages:

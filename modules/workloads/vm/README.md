@@ -99,13 +99,14 @@ module "app_vm" {
   image_name   = "default/ubuntu-22-04"
   network_name = "my-team-ns/vm-net-100"
 
-  ssh_authorized_keys = var.ssh_authorized_keys
   user_data = <<-EOT
     #cloud-config
     password: ${var.vm_password}
     chpasswd:
       expire: false
     ssh_pwauth: true
+    ssh_authorized_keys:
+      - ${var.ssh_public_key}
     packages:
       - qemu-guest-agent
     runcmd:
@@ -114,7 +115,9 @@ module "app_vm" {
 }
 ```
 
-> **Note:** Do not use a `users:` block with `password:` — on cloud-init 25.x this prevents
+> **Note:** When `user_data` is set, the module's `ssh_authorized_keys` and `password` inputs
+> are ignored — include them directly in your `user_data` cloud-config instead.
+> Do not use a `users:` block with `password:` — on cloud-init 25.x this prevents
 > the password from being applied to the default OS user. Use the top-level `password:` /
 > `chpasswd:` / `ssh_authorized_keys:` keys instead.
 
