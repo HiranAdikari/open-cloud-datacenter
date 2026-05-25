@@ -44,12 +44,23 @@ Required from the IdP side:
     `https://<cloud-ui-host>/v1/auth/callback`
   - `dcctl` — public, redirect URI
     `http://localhost:<random-port>/callback`
-- **An "admin" group**, plus a per-tenant group convention
-  (e.g. `tenant-<slug>`). dc-api maps OIDC group claims to platform
-  RBAC; see [docs/rbac.md](rbac.md) (added in a follow-up).
-- The `groups` claim on the ID token MUST list the user's group
-  memberships. Some IdPs require explicit opt-in to include groups in
-  the token.
+- **One platform-admin group** — a single group on the IdP whose
+  members are platform operators (register tenants, set capacity
+  caps, see the admin endpoints). Default group name `dc-admin`,
+  overridable via `DCAPI_ADMIN_GROUP`. dc-api also accepts a
+  fixed list of admin OIDC `sub` IDs via env var as an alternative
+  to (or alongside) the group, for break-glass access.
+- The ID token's `groups` claim must include the admin group for
+  users who should be admins. Some IdPs require explicit opt-in to
+  include the groups claim — decode a sample token before installing
+  to confirm.
+
+Tenant membership is **not** derived from IdP groups. Tenants are
+created by an admin (`POST /v1/admin/tenants`) and users are added to
+them by explicit invite (`POST /v1/tenants/{tid}/members` or the same
+via the UI). All authorisation past the admin signal lives in dc-api's
+own `role_assignments` table; the IdP only proves identity. See
+[docs/rbac.md](rbac.md) for the full role model.
 
 ---
 
