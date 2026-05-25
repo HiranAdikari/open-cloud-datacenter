@@ -36,11 +36,13 @@ note in [architecture.md](architecture.md) §3). The expected layout:
 my-cloud-config/
 ├── terraform.tfvars              # global vars: hostnames, OIDC, secrets refs
 ├── dependencies.yaml             # pins OCD ref the layers consume from
-├── 01-bootstrap/                 # main.tf calls modules/bootstrap
-├── 02-management/                # main.tf calls modules/management/*
-├── 03-identity/                  # main.tf calls modules/identity
-├── 04-dc-controlplane/           # provisions the dcapi-controlplane RKE2 cluster
-└── 05-dc-controlplane-services/  # deploys dc-api + cloud-ui + operators on it
+├── 01-bootstrap/                 # Rancher install on Harvester
+├── 02-rancher-auth/              # Rancher admin token
+├── 03-management/                # Harvester registration, networks, storage, RBAC
+├── 04-identity/                  # OIDC applications on the IdP
+├── 05-dc-controlplane/           # provisions the dcapi-controlplane RKE2 cluster
+├── 06-dc-controlplane-services/  # deploys dc-api + cloud-ui on it
+└── 07-dc-operators/              # keyvault operator + future managed-service operators
 ```
 
 Each layer is a normal Terraform layer. Each consumes the same root
@@ -95,31 +97,55 @@ The wrapper:
    present; `terraform.tfvars` complete; OIDC well-known URL reachable).
 2. Runs each Terraform layer in dependency order. Every layer plans
    then applies (`terraform apply -auto-approve`); the plan output for
-   every layer is printed inline so the log shows the full diff.
+   every layer is printed inline so the log shows the full diff. After
+   each apply the wrapper runs a per-layer readiness check (e.g. poll
+   Rancher `/v3/ping` after `01-bootstrap`, `kubectl wait` all nodes
+   Ready after `05-dc-controlplane`, `GET /healthz` on dc-api after
+   `06-dc-controlplane-services`) before starting the next layer. This
+   prevents "apply done" from racing the actual service coming up.
 
    Layers:
    - **01-bootstrap** — provisions an RKE2 VM on Harvester, installs
      Rancher into it, sets up the management LB IP pool.
-   - **02-management** — registers Harvester into Rancher; creates
+   - **02-rancher-auth** — bootstraps the Rancher admin password and
+     issues an API token consumed by every downstream layer.
+   - **03-management** — registers Harvester into Rancher; creates
      management networks, image catalogue, RBAC scaffolding.
-   - **03-identity** — creates OIDC applications (one for dc-api,
+   - **04-identity** — creates OIDC applications (one for dc-api,
      one for cloud-ui's BFF, one for dcctl) on the IdP.
-   - **04-dc-controlplane** — provisions a second RKE2 cluster (the
+   - **05-dc-controlplane** — provisions a second RKE2 cluster (the
      `dcapi-controlplane` cluster) that will host dc-api / cloud-ui
      / managed-service operators.
-   - **05-dc-controlplane-services** — installs the keyvault operator
-     CRDs + controller; deploys dc-api + cloud-ui Deployments + Services
-     + Ingress; creates the dc-api Postgres; wires the IdP client IDs +
-     secrets via a Kubernetes Secret.
+   - **06-dc-controlplane-services** — deploys dc-api + cloud-ui
+     Deployments + Services + Ingress on the dcapi-controlplane
+     cluster; creates the dc-api Postgres; wires the IdP client IDs
+     + secrets via a Kubernetes Secret.
+   - **07-dc-operators** — installs the keyvault operator (and future
+     per-service operators) onto the dcapi-controlplane cluster.
 3. Prints a summary with the URLs the operator hands to tenant owners.
+
+### One layer at a time — for manual cutovers
+
+For production cutovers where the operator wants to inspect cluster
+state between layers (verify Rancher's UI loads, that dcapi-cluster
+nodes look healthy in Rancher, etc.):
+
+```bash
+./scripts/bootstrap-cloud.sh --consumer-dir ../my-cloud-config --one-at-a-time
+```
+
+The wrapper runs just the first layer (`01-bootstrap`), runs the
+readiness gate, then exits with the resume command for the next
+layer. Run it again to continue.
 
 ### Partial / existing setups — eyeball plans first
 
 On an environment where some layers are already applied (e.g. you
-destroyed `04-dc-controlplane` + `05-dc-controlplane-services` to
-re-test bring-up but `01-bootstrap` / `02-management` /
-`03-identity` should be untouched), do a `--dry-run` pass first so
-you can read every layer's plan without anything being applied:
+destroyed `05-dc-controlplane` + `06-dc-controlplane-services` to
+re-test bring-up but `01-bootstrap` / `02-rancher-auth` /
+`03-management` / `04-identity` should be untouched), do a `--dry-run`
+pass first so you can read every layer's plan without anything being
+applied:
 
 ```bash
 ./scripts/bootstrap-cloud.sh --consumer-dir ../my-cloud-config --dry-run
@@ -145,7 +171,7 @@ when nothing changed. To resume after a transient failure on a specific
 layer:
 
 ```bash
-./scripts/bootstrap-cloud.sh --consumer-dir ../my-cloud-config --layer-from 04-dc-controlplane
+./scripts/bootstrap-cloud.sh --consumer-dir ../my-cloud-config --layer-from 05-dc-controlplane
 ```
 
 ---
@@ -181,7 +207,9 @@ Once the wrapper reports success:
   the wrapper. Each layer's `terraform apply` rolls out only the diff.
 - **Add a new managed service** (cache, database, etc.): the operator
   ships as a `crds/<service>/` module here; consumers reference it via
-  a new module call in their `05-dc-controlplane-services/` layer.
+  a new module call in their `07-dc-operators/` layer, plus a per-service
+  registration in `06-dc-controlplane-services/` if dc-api needs to be
+  rebuilt with new provider wiring.
 - **Backup / restore**: see [runbooks/](runbooks/) for the dc-api
   Postgres + Rancher etcd backup procedures.
 - **Audit + observability**: dc-api ships structured JSON logs at
