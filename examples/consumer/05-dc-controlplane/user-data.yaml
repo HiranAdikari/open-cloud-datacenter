@@ -1,0 +1,11 @@
+#cloud-config
+# Minimum cloud-init applied to every dc-controlplane RKE2 node.
+# Extend as needed (extra users, ssh keys, NTP overrides, …).
+package_update: true
+package_upgrade: false
+packages:
+  - qemu-guest-agent
+  - curl
+  - jq
+runcmd:
+  - systemctl enable --now qemu-guest-agent

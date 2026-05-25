@@ -327,6 +327,14 @@ run_layer() {
   echo "── Layer: $layer ──────────────────────────────────────────"
   pushd "$layer_dir" >/dev/null
 
+  # Symlink the root terraform.tfvars into this layer so terraform's
+  # auto-discovery picks it up. Each layer's variables.tf declares only
+  # the subset it actually reads; terraform tolerates undeclared keys
+  # in tfvars with a warning we suppress at plan time.
+  if [[ ! -e terraform.tfvars && -f "$consumer_dir/terraform.tfvars" ]]; then
+    ln -s "$consumer_dir/terraform.tfvars" terraform.tfvars
+  fi
+
   terraform init -input=false >/dev/null
   terraform fmt -check >/dev/null || terraform fmt >/dev/null
   terraform validate >/dev/null

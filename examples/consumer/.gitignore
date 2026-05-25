@@ -1,0 +1,18 @@
+# Consumer-specific values — never commit.
+terraform.tfvars
+*.secret.tfvars
+
+# Per-layer state (local backend default).
+*/terraform.tfstate*
+*/.terraform/
+*/.terraform.lock.hcl
+
+# Symlinks the wrapper creates per-layer (each layer's terraform.tfvars
+# points back at the root one — convenience for terraform's auto-discovery).
+*/terraform.tfvars
+
+# Kubeconfigs written by layer outputs (e.g. 05's dcapi proxy kubeconfig).
+*/.dcapi-kubeconfig
+
+# Plan files (transient).
+*/tfplan.out

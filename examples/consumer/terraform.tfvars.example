@@ -1,0 +1,130 @@
+# Open Cloud Data Center — consumer template values.
+#
+# Copy this file to terraform.tfvars in your consumer directory and fill in
+# every value. Comments call out the layer that reads each variable.
+#
+# This single file is read by every layer that needs the variable; each
+# layer's variables.tf declares only the subset it actually uses.
+
+# ─── Layer 01: Bootstrap ─────────────────────────────────────────────────────
+
+# Path to your Harvester cluster's kubeconfig (Harvester HCI's local kubeconfig,
+# not a downstream RKE2 kubeconfig). The bootstrap layer creates the Rancher VM
+# on this Harvester cluster.
+harvester_kubeconfig_path = "/path/to/harvester-kubeconfig.yaml"
+
+# FQDN you want Rancher served at. Must resolve to the LB IP that bootstrap
+# assigns from ippool_*.
+rancher_hostname = "rancher.cloud.example.com"
+
+# Temporary password Helm sets on the freshly-installed Rancher. Permanent
+# password is set by 02-rancher-auth.
+bootstrap_password = "CHANGE-ME-temporary"
+
+# OS image to clone for the Rancher VM. The bootstrap module downloads this
+# into Harvester if it isn't already present.
+image_url = "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
+
+# Console/SSH password for the rancher VM user.
+vm_password = "CHANGE-ME-vm-password"
+
+# Harvester namespace where the Rancher VM lives.
+harvester_namespace = "rancher-infra"
+
+# Number of Rancher VM nodes. 1 = dev; 3 = HA (kube-vip-fronted RKE2).
+node_count = 1
+
+# Bridge network the Rancher VM joins. Must exist on Harvester.
+network_type = "vlan"
+network_name = "default/vm-net-100"
+
+# IP pool the Rancher LoadBalancer draws from. Pre-existing free range on the
+# management VLAN; the platform also uses spare addresses from this pool for
+# downstream LBs (dc-api ingress, dcapi-controlplane apiserver, …).
+create_lb           = true
+ippool_subnet       = "192.168.50.0/24"
+ippool_gateway      = "192.168.50.1"
+ippool_start        = "192.168.50.10"
+ippool_end          = "192.168.50.30"
+ippool_network_name = "default/vm-net-100"
+static_rancher_ip   = "192.168.50.10"
+
+# Versions.
+rke2_version    = "v1.33.10+rke2r3"
+rancher_version = "v2.12.1"
+
+# TLS source for Rancher. "rancher" (Rancher generates self-signed) is OK for
+# dev; "letsEncrypt" needs publicly-resolvable rancher_hostname; "secret" lets
+# you ship your own cert.
+tls_source = "rancher"
+
+# ─── Layer 02: Rancher Auth ──────────────────────────────────────────────────
+
+# Permanent admin password set by rancher2_bootstrap. Rotated independently of
+# bootstrap_password.
+rancher_admin_password = "CHANGE-ME-permanent-rancher-admin"
+
+# ─── Layer 03: Management ────────────────────────────────────────────────────
+
+# Name Harvester appears under in Rancher after registration.
+harvester_cluster_name = "harvester"
+
+# ─── Layer 04: Identity ──────────────────────────────────────────────────────
+
+# Asgardeo (the default IdP preset). Swap to azure-ad in 04-identity/main.tf
+# for Azure AD, or roll your own provider preset.
+asgardeo_org_name = "your-asgardeo-org"
+asgardeo_app_name = "rancher-sso"
+
+# Whether the IdP should skip the per-user consent prompt during login.
+# true = smoother UX inside a trusted org; false = explicit consent each time.
+skip_consent = true
+
+# ─── Layer 05: DC-Controlplane ───────────────────────────────────────────────
+
+dcapi_cluster_name = "dcapi-controlplane-rke2"
+dcapi_project_name = "dc-api"
+
+# Reserved range on the same management VLAN for kube-vip + ingress VIPs the
+# dcapi-controlplane cluster needs. MUST NOT overlap with ippool_start/end above.
+dcapi_lb_range_start = "192.168.50.35"
+dcapi_lb_range_end   = "192.168.50.40"
+
+# ─── Layer 06: DC-Controlplane Services ──────────────────────────────────────
+
+# Public hostname dc-api answers at (must resolve to a free IP from the
+# dcapi_lb_range above).
+dcapi_hostname = "dcapi.cloud.example.com"
+cloud_ui_hostname = "cloud.cloud.example.com"
+
+# Container images. Default to the canonical builds OCD CI publishes; override
+# for Path B (build from source) installs.
+dc_api_image            = "ghcr.io/wso2/dc-api:v0.9.0"
+cloud_ui_image          = "ghcr.io/wso2/cloud-ui:v0.9.0"
+
+# OIDC for dc-api's BFF. Create these clients on your IdP manually (see
+# docs/prerequisites.md §Identity). cloud-ui-bff is confidential (holds a
+# secret); dcctl is public PKCE.
+oidc_issuer_url      = "https://api.asgardeo.io/t/your-asgardeo-org"
+bff_client_id        = "REPLACE-ME-cloud-ui-bff-client-id"
+bff_client_secret    = "REPLACE-ME-cloud-ui-bff-client-secret"
+dcctl_client_id      = "REPLACE-ME-dcctl-client-id"
+
+# dc-api admin signal — IdP group whose members are platform admins.
+admin_group = "dc-admin"
+
+# Reserved IPs the platform should exclude from KubeOVN's VPC external IPAM
+# (the platform allocates VPC EIPs from a separate range, this is the
+# exclude list for what's already in use on the management VLAN).
+vpc_external_reserved_ips = "192.168.50.10,192.168.50.30,192.168.50.35"
+vpc_external_vlan_id      = 0
+
+# ─── Layer 07: DC-Operators ──────────────────────────────────────────────────
+
+dc_webhook_image        = "ghcr.io/wso2/dc-webhook:v0.9.0"
+keyvault_operator_image = "ghcr.io/wso2/keyvault-operator:v0.9.0"
+
+# GHCR pull credentials. Required when pulling private images (Path B builds
+# into a private registry) — leave blank for canonical public ghcr.io/wso2/*.
+ghcr_username = ""
+ghcr_pat      = ""
