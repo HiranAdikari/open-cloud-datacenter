@@ -1,0 +1,119 @@
+name: Build and Deploy cloud-ui
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud-ui/**'
+      - 'dc-api/openapi.yaml'
+      - '.github/workflows/cloud-ui.yaml'
+  # Allow manual retrigger from the Actions UI or via `gh workflow run`.
+  # Useful after recovering from the rke2 crashloop documented in
+  # docs/runbooks/rke2-recovery.md — queued jobs from before the listener
+  # restart get orphaned and we need a fresh run to deploy the latest SHA.
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/hiranadikari/cloud-ui
+
+jobs:
+  test:
+    runs-on: dc-runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: cloud-ui/pnpm-lock.yaml
+
+      - name: Install
+        run: cd cloud-ui && pnpm install --frozen-lockfile
+
+      - name: Generate types
+        run: cd cloud-ui && pnpm gen:api
+
+      - name: Type-check
+        run: cd cloud-ui && pnpm exec tsc --noEmit -p tsconfig.app.json
+
+      - name: Lint
+        run: cd cloud-ui && pnpm lint
+
+  build-and-deploy:
+    needs: test
+    runs-on: dc-runner
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Runner image has no pre-installed k8s tooling — install kubectl.
+      - name: Install kubectl
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -fsSL "https://dl.k8s.io/release/v1.33.0/bin/linux/amd64/kubectl" -o "$HOME/bin/kubectl"
+          chmod +x "$HOME/bin/kubectl"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          "$HOME/bin/kubectl" version --client
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push cloud-ui image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./cloud-ui/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+      # Runner is in-cluster — kubectl uses the mounted service account token.
+      # No KUBECONFIG secret required (mirrors dc-api deploy step).
+      #
+      # apply_with_retry: kubectl apply per-file with exponential backoff.
+      # The nginx-ingress validating webhook occasionally times out (seen
+      # 2026-05-17: "context deadline exceeded" on the cloud-ui ingress
+      # create, transient cluster blip). Retrying the same apply almost
+      # always succeeds; without retries a single 9s webhook hiccup fails
+      # the whole deploy and we have to manually re-run the job.
+      - name: Deploy to LK DC
+        run: |
+          set -uo pipefail
+
+          apply_with_retry() {
+            local file=$1
+            local attempts=5
+            for i in $(seq 1 "$attempts"); do
+              if kubectl apply -f "$file"; then
+                return 0
+              fi
+              if [ "$i" -lt "$attempts" ]; then
+                local delay=$((i * 3))
+                echo "::warning::apply of $file failed (attempt $i/$attempts), retrying in ${delay}s..."
+                sleep "$delay"
+              fi
+            done
+            echo "::error::apply of $file failed after $attempts attempts"
+            return 1
+          }
+
+          apply_with_retry cloud-ui/deploy/service.yaml
+          apply_with_retry cloud-ui/deploy/ingress.yaml
+          apply_with_retry cloud-ui/deploy/deployment.yaml
+
+          kubectl set image deployment/cloud-ui \
+            cloud-ui=${{ env.IMAGE }}:${{ github.sha }} \
+            -n dc-system
+          kubectl rollout status deployment/cloud-ui -n dc-system --timeout=120s

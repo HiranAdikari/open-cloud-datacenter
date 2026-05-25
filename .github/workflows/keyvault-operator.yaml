@@ -1,0 +1,72 @@
+name: Build KVI Operator
+
+# Builds + pushes the keyvault-operator image to ghcr.io on changes under
+# crds/keyvault/**. Does NOT deploy — the operator runs on the workload
+# cluster (harvester-dev) and is deployed by Terraform (the OCD module at
+# modules/management/keyvault-operator/). To roll a new image into the
+# cluster, bump the image tag in the consumer layer's variables.tf and
+# `terraform apply`.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crds/keyvault/**'
+      - '.github/workflows/keyvault-operator.yaml'
+  # Manual retrigger from the Actions UI or `gh workflow run` — useful when
+  # the ARC listener got an orphan-queue (see CLAUDE.md "ARC runner queue
+  # gets orphaned after listener restart").
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/hiranadikari/keyvault-operator
+
+jobs:
+  test:
+    runs-on: dc-runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: crds/keyvault/go.mod
+          cache-dependency-path: crds/keyvault/go.sum
+
+      - name: Run unit tests
+        run: cd crds/keyvault && go test ./...
+
+  build-and-push:
+    needs: test
+    runs-on: dc-runner
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push keyvault-operator image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./crds/keyvault
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Summary
+        run: |
+          echo "### KVI operator image pushed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.IMAGE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To roll into harvester-dev: bump \`kvi_operator_image_tag\`" >> $GITHUB_STEP_SUMMARY
+          echo "in the consumer layer and \`terraform apply\`." >> $GITHUB_STEP_SUMMARY

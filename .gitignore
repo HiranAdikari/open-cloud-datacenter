@@ -1,16 +1,10 @@
-# Compiled class file
-*.class
+# Binaries
+dc-api/dc-api
+dc-api/webhook
+dcctl/dcctl
+*.exe
 
-# Log file
-*.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
+# Archives (preserved from OCD original — keep binary blobs out of git)
 *.jar
 *.war
 *.nar
@@ -19,12 +13,58 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# Test debris — local-only run logs / debug notes from integration runs
+dc-api/test-output/
 
-# Infrastructure Tools
-.terraform/
-*.tfstate*
-*.tfvars
+# Go build artifacts
+*.test
+*.out
+
+# Credentials & secrets — NEVER commit these
+*.secret.*
+secrets.yaml
 .env
+.env.*
+!.env.example
+dc-api/deploy/secret.yaml
+credentials.json
+kubeconfig
+*.kubeconfig
+
+# dcctl local state
+~/.dcctl/
+
+# Terraform (if any TF files are added)
+*.tfstate
+*.tfstate.backup
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+__MACOSX/
+
+# Go module cache (not needed in repo)
+vendor/
+
+# Log files
+*.log
+
+# Claude Code runtime artefacts (local-only state)
+.claude/scheduled_tasks.lock
+
+# Pandoc-rendered .docx exports — internal sharing only, not source of truth
+docs/*.docx
+
+# Local-only scratch / personal notes — never committed
+.misc/
+
+# Hypothesis example DB cache (produced by the schemathesis contract test)
+dc-api/.hypothesis/

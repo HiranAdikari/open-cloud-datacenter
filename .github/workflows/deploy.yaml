@@ -1,0 +1,134 @@
+name: Build and Deploy DC-API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dc-api/**'
+      - '.github/workflows/deploy.yaml'
+  # Allow manual retrigger from the Actions UI or via `gh workflow run`.
+  # Useful after recovering from the rke2 crashloop documented in
+  # docs/runbooks/rke2-recovery.md — queued jobs from before the listener
+  # restart get orphaned and we need a fresh run to deploy the latest SHA.
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/hiranadikari/dc-api
+  WEBHOOK_IMAGE: ghcr.io/hiranadikari/dc-api-webhook
+
+jobs:
+  test:
+    runs-on: dc-runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: dc-api/go.mod
+          cache-dependency-path: dc-api/go.sum
+
+      - name: Run tests
+        run: cd dc-api && go test ./...
+
+  build-and-deploy:
+    needs: test
+    runs-on: dc-runner
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install kubectl — runner image has no pre-installed k8s tooling.
+      # Version is pinned; bump deliberately when upgrading the cluster.
+      - name: Install kubectl
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -fsSL "https://dl.k8s.io/release/v1.33.0/bin/linux/amd64/kubectl" -o "$HOME/bin/kubectl"
+          chmod +x "$HOME/bin/kubectl"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          "$HOME/bin/kubectl" version --client
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push dc-api image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./dc-api
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+      # F14: dc-api-webhook is a separate binary (cmd/webhook/) and image
+      # (Dockerfile.webhook). It runs on the harvester-dev cluster, not on
+      # dcapi-controlplane-rke2, so it's deployed by Terraform — CI just
+      # builds and pushes the image. The deploy step below only handles
+      # dc-api.
+      - name: Build and push dc-api-webhook image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./dc-api
+          file: ./dc-api/Dockerfile.webhook
+          push: true
+          tags: |
+            ${{ env.WEBHOOK_IMAGE }}:latest
+            ${{ env.WEBHOOK_IMAGE }}:${{ github.sha }}
+
+      # Runner is in-cluster — kubectl picks up the mounted service account
+      # token automatically. No KUBECONFIG secret required.
+      #
+      # We deliberately do NOT re-apply these on every deploy:
+      #   - namespace.yaml: dc-api-deployer SA is namespace-scoped to dc-system
+      #     and lacks cluster-level GET on namespaces. The namespace is
+      #     bootstrapped once via the operator's manual setup; CI shouldn't
+      #     re-create it.
+      #   - postgres.yaml: the StatefulSet was created without
+      #     kubectl.kubernetes.io/last-applied-configuration, so kubectl apply
+      #     can't compute a clean patch and trips the "immutable spec field"
+      #     guard on every run. Postgres lifecycle is intentionally hands-off
+      #     post-bootstrap; if a real upgrade is needed, do it as a one-off.
+      #   - configmap.yaml: TF-managed via wso2-datacenter-project; the
+      #     in-repo copy is a stale skeleton (no DCAPI_BFF_* / DCAPI_VPC_*
+      #     keys) and applying it would strip required env vars from the
+      #     live ConfigMap and crashloop dc-api on next restart. ConfigMap
+      #     changes go through TF; CI only ships new images.
+      #
+      # apply_with_retry: per-file apply with exponential backoff. Guards
+      # against transient admission-webhook timeouts (nginx-ingress
+      # validating webhook flaked on 2026-05-17 deploys with
+      # "context deadline exceeded" after 9s — a re-apply usually works).
+      - name: Deploy to LK DC
+        run: |
+          set -uo pipefail
+
+          apply_with_retry() {
+            local file=$1
+            local attempts=5
+            for i in $(seq 1 "$attempts"); do
+              if kubectl apply -f "$file"; then
+                return 0
+              fi
+              if [ "$i" -lt "$attempts" ]; then
+                local delay=$((i * 3))
+                echo "::warning::apply of $file failed (attempt $i/$attempts), retrying in ${delay}s..."
+                sleep "$delay"
+              fi
+            done
+            echo "::error::apply of $file failed after $attempts attempts"
+            return 1
+          }
+
+          apply_with_retry dc-api/deploy/ingress.yaml
+          apply_with_retry dc-api/deploy/deployment.yaml
+
+          kubectl set image deployment/dc-api \
+            dc-api=${{ env.IMAGE }}:${{ github.sha }} \
+            -n dc-system
+          kubectl rollout status deployment/dc-api -n dc-system --timeout=120s

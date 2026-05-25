@@ -1,0 +1,77 @@
+name: Contract Tests (Schemathesis)
+
+# Run schemathesis against an in-process dc-api with all backends nopped
+# out. Pre-merge gate that fails the build the moment a handler diverges
+# from openapi.yaml.
+#
+# Scope is the subset of operations that don't need a real Harvester /
+# Rancher cluster: /healthz, /v1/key-vaults*, /v1/tenants*. The contract
+# test in dc-api/test/contract/contract_test.go owns the include-tag filter.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dc-api/**'
+      - '.github/workflows/contract.yaml'
+  pull_request:
+    paths:
+      - 'dc-api/**'
+      - '.github/workflows/contract.yaml'
+  # Allow manual re-runs when the self-hosted runner reaps the pod mid-job
+  # (happens when the workspace is on slow storage and setup-go's cache
+  # write stalls long enough that the listener pod's lifecycle policy
+  # cancels the runner). Matches the manual trigger on deploy.yaml.
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: dc-runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: dc-api/go.mod
+          cache-dependency-path: dc-api/go.sum
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install schemathesis
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'schemathesis==4.4.4'
+          schemathesis --version
+
+      # The in-cluster `dc-runner` has flaky egress to Docker Hub (TLS
+      # handshake timeouts seen on two consecutive runs 2026-05-15/16).
+      # testcontainers doesn't retry the manifest fetch, so a single
+      # network blip during the Go test fails the whole job. Pre-pulling
+      # here with explicit retries lets the workflow soak up the flake
+      # without surfacing as a contract-test failure.
+      - name: Pre-pull testcontainers image (Docker Hub flake mitigation)
+        run: |
+          set -e
+          for attempt in 1 2 3 4 5; do
+            if docker pull postgres:16-alpine; then
+              echo "pulled on attempt $attempt"
+              exit 0
+            fi
+            echo "attempt $attempt failed, sleeping…"
+            sleep $((attempt * 5))
+          done
+          echo "Docker Hub still unreachable after 5 attempts"
+          exit 1
+
+      - name: Run contract test
+        working-directory: dc-api
+        # The dc-runner is in-cluster on dcapi-controlplane-rke2 — it
+        # talks to the host docker daemon, so testcontainers works without
+        # the rootless workarounds we need on the Mac.
+        # 10m outer ceiling — the test's own context timeout (8m) is the
+        # primary kill switch; this gives go test enough margin to print
+        # output, tear down containers, and exit cleanly without itself
+        # being SIGKILLed.
+        run: go test -tags contract -timeout 10m -v ./test/contract/...
