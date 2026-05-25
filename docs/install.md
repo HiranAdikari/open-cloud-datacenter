@@ -93,8 +93,11 @@ The wrapper:
 
 1. Validates prerequisites (`terraform`, `kubectl`, `jq`, `yq`, `curl`
    present; `terraform.tfvars` complete; OIDC well-known URL reachable).
-2. Runs each Terraform layer in dependency order, waiting for each to
-   finish cleanly:
+2. Runs each Terraform layer in dependency order. Every layer plans
+   then applies (`terraform apply -auto-approve`); the plan output for
+   every layer is printed inline so the log shows the full diff.
+
+   Layers:
    - **01-bootstrap** — provisions an RKE2 VM on Harvester, installs
      Rancher into it, sets up the management LB IP pool.
    - **02-management** — registers Harvester into Rancher; creates
@@ -106,9 +109,29 @@ The wrapper:
      / managed-service operators.
    - **05-dc-controlplane-services** — installs the keyvault operator
      CRDs + controller; deploys dc-api + cloud-ui Deployments + Services
-     + Ingress; creates the dc-api Postgres; wires Asgardeo client IDs +
+     + Ingress; creates the dc-api Postgres; wires the IdP client IDs +
      secrets via a Kubernetes Secret.
 3. Prints a summary with the URLs the operator hands to tenant owners.
+
+### Partial / existing setups — eyeball plans first
+
+On an environment where some layers are already applied (e.g. you
+destroyed `04-dc-controlplane` + `05-dc-controlplane-services` to
+re-test bring-up but `01-bootstrap` / `02-management` /
+`03-identity` should be untouched), do a `--dry-run` pass first so
+you can read every layer's plan without anything being applied:
+
+```bash
+./scripts/bootstrap-cloud.sh --consumer-dir ../my-cloud-config --dry-run
+```
+
+For each untouched layer the plan must show **`No changes`** — if
+any of them show a non-zero diff, that's a signal that either the
+import is wrong, a variable drifted, or some out-of-band manual
+edit happened. Fix the divergence before re-running without
+`--dry-run`.
+
+Once the dry-run looks right, run without `--dry-run` to apply.
 
 End-to-end time: **~25–40 min** on a healthy Harvester cluster. The two
 slow steps are the Rancher install (~10 min) and the
@@ -124,15 +147,6 @@ layer:
 ```bash
 ./scripts/bootstrap-cloud.sh --consumer-dir ../my-cloud-config --layer-from 04-dc-controlplane
 ```
-
-### Dry-run
-
-```bash
-./scripts/bootstrap-cloud.sh --consumer-dir ../my-cloud-config --dry-run
-```
-
-Plans every layer in sequence without applying. Useful before a destructive
-change or to preview what a fresh install would do.
 
 ---
 

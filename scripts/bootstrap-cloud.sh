@@ -22,7 +22,16 @@
 #       --consumer-dir   ../my-cloud-config      # where terraform.tfvars lives
 #       [--layer-from    01-bootstrap]           # resume from a specific layer
 #       [--skip-prereq]                          # skip the prerequisite checks
-#       [--dry-run]                              # plan only, no apply
+#       [--dry-run]                              # plan every layer, apply nothing
+#
+# Default behaviour: each layer plans then applies (terraform apply
+# -auto-approve). Plans are printed inline so the log shows the diff
+# for every layer.
+#
+# Partial / existing setups: do one --dry-run pass first to eyeball
+# every layer's plan (layers you didn't touch should show
+# "No changes"). Once you're happy with the diffs, re-run without
+# --dry-run to apply.
 #
 # Exit codes:
 #   0 success
@@ -48,7 +57,7 @@ while [[ $# -gt 0 ]]; do
     --skip-prereq)  skip_prereq=true; shift ;;
     --dry-run)      dry_run=true; shift ;;
     -h|--help)
-      grep '^#' "$0" | sed 's/^# \{0,1\}//' | head -40
+      grep '^#' "$0" | sed 's/^# \{0,1\}//' | head -50
       exit 0
       ;;
     *)
@@ -163,11 +172,14 @@ run_layer() {
 
   if $dry_run; then
     terraform plan -input=false -compact-warnings
-  else
-    terraform plan -input=false -compact-warnings -out=tfplan.out
-    terraform apply -input=false -auto-approve tfplan.out
-    rm -f tfplan.out
+    popd >/dev/null
+    echo "✓ $layer planned (dry-run, no apply)"
+    return 0
   fi
+
+  terraform plan -input=false -compact-warnings -out=tfplan.out
+  terraform apply -input=false -auto-approve tfplan.out
+  rm -f tfplan.out
 
   popd >/dev/null
   echo "✓ $layer done"
