@@ -35,7 +35,7 @@ provider "harvester" {
 provider "tls" {}
 
 module "bootstrap" {
-  source = "github.com/wso2-enterprise/open-cloud-datacenter//modules/bootstrap?ref=v0.1.0"
+  source = "../.."
 
   vm_name              = "rancher-bootstrap"
   node_count           = 1
@@ -46,8 +46,8 @@ module "bootstrap" {
   ubuntu_image_id = "default/ubuntu-22-04"
 
   # Credentials – supply via tfvars or environment variables; never hardcode
-  vm_password            = var.vm_password
-  rancher_admin_password = var.rancher_admin_password
+  vm_password        = var.vm_password
+  bootstrap_password = var.bootstrap_password
 
   rancher_hostname = "rancher.example.internal"
 
@@ -63,7 +63,7 @@ variable "vm_password" {
   sensitive = true
 }
 
-variable "rancher_admin_password" {
+variable "bootstrap_password" {
   type      = string
   sensitive = true
 }

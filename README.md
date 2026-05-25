@@ -79,28 +79,42 @@ for how they relate.
 |--------|-------------|
 | [modules/bootstrap](modules/bootstrap/README.md) | Provisions an RKE2-based Rancher server on Harvester HCI via cloud-init, with a Load Balancer and IP pool for external access. |
 
+### Identity
+
+| Module | Description |
+|--------|-------------|
+| [modules/identity/rancher-oidc](modules/identity/rancher-oidc/README.md) | Configures Rancher to use a generic OIDC provider for user authentication. |
+| [modules/identity/providers/asgardeo](modules/identity/providers/asgardeo/README.md) | Presets for integrating WSO2 Asgardeo as the identity provider. |
+
 ### Management
 
 | Module | Description |
 |--------|-------------|
 | [modules/management/networking](modules/management/networking/README.md) | Creates and manages VLAN-backed Harvester networks for tenant and management workloads. |
 | [modules/management/storage](modules/management/storage/README.md) | Downloads and registers OS images into Harvester HCI, making them available for VM provisioning. |
-| [modules/management/rbac](modules/management/rbac/README.md) | Creates Rancher projects and namespaces with resource quotas for multi-tenant RBAC isolation. |
+| [modules/management/cluster-roles](modules/management/cluster-roles/README.md) | Defines custom Rancher role templates (e.g. `vm-metrics-observer`) shared across tenant projects. |
+| [modules/management/tenant-space](modules/management/tenant-space/README.md) | Full team onboarding: creates a Rancher project, namespace, resource quotas, and role bindings. |
+| [modules/management/rbac](modules/management/rbac/README.md) | Lightweight module for bulk creating projects and namespaces without advanced role bindings. |
 | [modules/management/harvester-integration](modules/management/harvester-integration/README.md) | Registers the Harvester HCI cluster into Rancher, enabling the UI extension and cloud credential. |
-| [modules/management/cluster-roles](modules/management/cluster-roles/README.md) | Cluster-role + RoleBinding scaffolding for the platform. |
-| [modules/management/tenant-space](modules/management/tenant-space/README.md) | Per-tenant namespace + Project + quota set. |
+| [modules/management/dc-controlplane](modules/management/dc-controlplane/) | Provisions the `dcapi-controlplane` RKE2 cluster that hosts dc-api / cloud-ui / managed-service operators. Bundles kube-vip + dual-NIC + IP pool wiring. |
+| [modules/management/dc-controlplane-services](modules/management/dc-controlplane-services/) | Deploys dc-api + cloud-ui + Postgres onto the dcapi-controlplane cluster; wires the OIDC client IDs + secrets. |
+| [modules/management/dc-webhook](modules/management/dc-webhook/README.md) | Admission webhook supporting dc-api's tenant-isolation guarantees. |
+| [modules/management/namespace-credential-provisioner](modules/management/namespace-credential-provisioner/README.md) | Reconciler that mints per-namespace credentials for tenant workloads. |
 
-### Identity
+### Monitoring
 
 | Module | Description |
 |--------|-------------|
-| [modules/identity](modules/identity/README.md) | OIDC integration — used as the auth boundary for `dc-api`. |
+| [modules/monitoring](modules/monitoring/README.md) | Deploys a full monitoring stack (Prometheus / Alertmanager / Calert) with Google Chat notification support. |
 
 ### Workloads
 
 | Module | Description |
 |--------|-------------|
 | [modules/workloads/k8s-cluster](modules/workloads/k8s-cluster/README.md) | Provisions a tenant RKE2 cluster as a VM set on Harvester via Rancher. |
+| [modules/workloads/vm](modules/workloads/vm/README.md) | Provisions standalone virtual machines on Harvester HCI with support for multiple disks and cloud-init. |
+| [modules/workloads/harvester-cloud-credential](modules/workloads/harvester-cloud-credential/) | Creates the Harvester cloud credential in Rancher that downstream workload modules use. |
+| [modules/workloads/harvester-vm-access](modules/workloads/harvester-vm-access/) | RBAC bindings letting Rancher project members reach Harvester VM consoles + VNCs. |
 
 ---
 

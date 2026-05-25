@@ -107,25 +107,65 @@ This phase uses four modules, typically applied together:
 
 **Provider dependencies**: `rancher/rancher2 ~> 3.0`
 
+#### 2e. namespace-credential-provisioner (`modules/management/namespace-credential-provisioner`)
+
+- Deploys a long-running reconciler on the Harvester cluster that watches for tenant namespaces.
+- For each namespace, automatically creates a scoped ServiceAccount, RoleBindings, and a
+  `harvester-vm-kubeconfig` Secret that consumer teams use to authenticate the `harvester`
+  Terraform provider — no admin involvement, no file handover.
+- Backfills existing namespaces on startup (safe to deploy to running clusters).
+- Cleans up cross-namespace RoleBindings when a namespace is deleted.
+
+**Must be deployed before `tenant-space` creates namespaces** so that credentials are
+ready by the time consumer teams run `terraform apply`.
+
+**Provider dependencies**: `hashicorp/kubernetes >= 2.0`
+
 ---
 
-### Phase 3 — Tenants
+### Phase 3 — Identity & Monitoring
 
-**Purpose**: Provision on-demand Kubernetes clusters for tenant teams.
+**Purpose**: Configure external authentication and deep observability for the datacenter.
 
-**Module**: `modules/workloads/k8s-cluster`
+#### 3a. identity (`modules/identity/*`)
 
-**What it does**:
-- Fetches the Harvester cloud credential from Rancher (`data.rancher2_cloud_credential`).
-- Defines a `rancher2_machine_config_v2` describing the VM size, image, and network for cluster nodes.
-- Provisions a `rancher2_cluster_v2` RKE2 cluster using the machine config.
-- Each cluster gets a dedicated machine pool combining control-plane, etcd, and worker roles.
+- **rancher-oidc**: Configures Rancher to delegate authentication to an external OIDC provider (e.g. WSO2 Asgardeo or Azure AD).
+- **providers/asgardeo**: Presets for integrating WSO2 Asgardeo.
+
+#### 3b. monitoring (`modules/monitoring`)
+
+- Deploys `calert` and `google-chat-notifications` on top of the `rancher-monitoring` stack.
+- Configures PrometheusRules and Alertmanager to route critical alerts to Google Chat Spaces.
+- Installs curated Grafana dashboards for Harvester nodes, storage, and VMs.
+
+---
+
+### Phase 4 — Workloads
+
+**Purpose**: Provision on-demand Kubernetes clusters and standalone VMs for tenant teams.
+
+#### 4a. k8s-cluster (`modules/workloads/k8s-cluster`)
+
+- **What it does**:
+  - Fetches the Harvester cloud credential from Rancher (`data.rancher2_cloud_credential`).
+  - Defines a `rancher2_machine_config_v2` describing the VM size, image, and network for cluster nodes.
+  - Provisions a `rancher2_cluster_v2` RKE2 cluster using the machine config.
+  - Each cluster gets a dedicated machine pool combining control-plane, etcd, and worker roles.
 
 **Provider dependencies**: `rancher/rancher2 ~> 3.0`
 
+#### 4b. vm (`modules/workloads/vm`)
+
+- **What it does**:
+  - Provisions standalone virtual machines directly on Harvester HCI.
+  - Supports multiple additional disks, custom network interfaces, and cloud-init (user-data/network-data).
+  - Automatically manages SSH keys and cloud-init secrets.
+
+**Provider dependencies**: `harvester/harvester ~> 0.6.0`
+
 ---
 
-### Phase 4 — Asgardeo Auth (Future)
+### Phase 5 — Asgardeo Auth (Future)
 
 **Purpose**: Integrate Asgardeo as an external OIDC identity provider for Rancher and tenant clusters.
 
@@ -137,13 +177,11 @@ This phase configures the `asgardeo` provider (or equivalent OIDC configuration 
 
 | Provider | Used In | Purpose |
 |----------|---------|---------|
-| `harvester/harvester ~> 0.6.0` | bootstrap, networking, storage, harvester-integration | Manage Harvester VMs, networks, images, settings |
-| `hashicorp/tls ~> 4.0` | bootstrap | Generate SSH key pairs |
-| `hashicorp/helm ~> 2.0` | bootstrap (declared, cloud-init handles install) | Helm provider declaration |
-| `rancher/rancher2 ~> 3.0` | rbac, k8s-cluster | Manage Rancher projects, namespaces, cluster provisioning |
-| `rancher/rancher2 ~> 8.0.0` | harvester-integration | Rancher settings, catalogs, apps, cloud credentials, cluster import |
-| `hashicorp/kubernetes ~> 2.30.0` | harvester-integration | Patch Harvester CoreDNS ConfigMap |
-| `asgardeo` | Phase 4 (future) | OIDC identity provider integration |
+| `harvester/harvester ~> 1.7` | bootstrap, workloads/vm | Manage Harvester VMs, networks, images |
+| `rancher/rancher2 ~> 13.1` | management/cluster-roles, management/tenant-space, identity/rancher-oidc | Rancher projects, namespaces, role templates, OIDC auth config |
+| `hashicorp/kubernetes ~> 3.0` | monitoring | Deploy monitoring resources to Harvester cluster |
+| `hashicorp/kubernetes ~> 2.35` | workloads/harvester-cloud-credential | Cross-cluster credential provisioning |
+| `asgardeo/asgardeo ~> 0.1` | identity/providers/asgardeo | Asgardeo application and OIDC configuration (Phase 5, future) |
 
 ---
 
@@ -179,11 +217,31 @@ This phase configures the `asgardeo` provider (or equivalent OIDC configuration 
            │
            │ projects/namespaces ready
            ▼
-    ┌────────────────┐
-    │  k8s-cluster   │
-    │  (Phase 3)     │
-    │  (per tenant)  │
-    └────────────────┘
+    ┌─────────────────────────┐
+    │ namespace-credential-   │
+    │ provisioner (Phase 2e)  │
+    └──────────┬──────────────┘
+               │ harvesterconfig + harvester-vm-kubeconfig per namespace
+               ▼
+    ┌───────────────────┐
+    │   identity        │
+    │   (Phase 3a)      │
+    └────────┬──────────┘
+             │ OIDC active
+             ▼
+    ┌───────────────────┐
+    │   monitoring      │
+    │   (Phase 3b)      │
+    └────────┬──────────┘
+             │ observability ready
+             ▼
+    ┌─────────────────────────────────┐
+    │       Workloads (Phase 4)       │
+    │  ┌─────────────┐ ┌───────────┐  │
+    │  │ k8s-cluster │ │    vm     │  │
+    │  │ (Phase 4a)  │ │ (Phase 4b)│  │
+    │  └─────────────┘ └───────────┘  │
+    └─────────────────────────────────┘
 ```
 
 ---
