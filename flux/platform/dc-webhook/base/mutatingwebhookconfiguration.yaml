@@ -1,0 +1,33 @@
+# failurePolicy: Ignore — if the webhook is down, non-OVN VMs must not be
+# blocked. OVN VMs without annotations simply fail to get correct MAC
+# allocation (same outcome as pre-F14).
+#
+# caBundle is auto-populated by cert-manager's cainjector based on the
+# annotation below. The annotation MUST point at the Certificate created
+# in certificate.yaml.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: dc-api-ovn-mac-webhook
+  annotations:
+    cert-manager.io/inject-ca-from: dc-webhook/dc-api-webhook
+webhooks:
+  - name: virtualmachines.kubevirt.io.dc-api.placeholder.example.com
+    admissionReviewVersions: ["v1"]
+    clientConfig:
+      service:
+        name: dc-api-webhook
+        namespace: dc-webhook
+        path: /mutate
+        port: 443
+      # caBundle is patched in at runtime by cert-manager cainjector.
+    rules:
+      - apiGroups:   ["kubevirt.io"]
+        apiVersions: ["v1"]
+        resources:   ["virtualmachines"]
+        operations:  ["CREATE", "UPDATE"]
+        scope:       "Namespaced"
+    failurePolicy: Ignore
+    sideEffects: None
+    timeoutSeconds: 5
+    reinvocationPolicy: Never
