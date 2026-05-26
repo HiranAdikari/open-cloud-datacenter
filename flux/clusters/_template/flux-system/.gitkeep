@@ -1,7 +1,0 @@
-# Filled by `flux bootstrap` (or the 06-flux-bootstrap TF layer):
-#   - gotk-components.yaml   Flux controller manifests
-#   - gotk-sync.yaml         GitRepository + root Kustomization pointing at this dir
-#   - kustomization.yaml     ties the two together
-#
-# These are auto-generated; don't hand-edit. To rotate the deploy key or
-# repo URL, re-run the bootstrap with the new values.
