@@ -1,0 +1,76 @@
+# Per-env overlay. Patches the shared flux/platform/ base with this env's
+# hostnames, image refs, replica counts, and references the sealed secrets
+# alongside this file.
+#
+# Copy this directory, rename to your env (e.g. lk-dev, customer-prod-eu),
+# replace every CHANGE-ME placeholder, and `flux/clusters/_template/platform.yaml`
+# (which lives in `flux/clusters/<your-env>/platform.yaml` after the copy)
+# points at this path.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../platform
+  # Sealed secrets the wizard creates here. Examples:
+  # - sealed-asgardeo-m2m.yaml
+  # - sealed-rancher-token.yaml
+  # - sealed-harvester-kubeconfig.yaml
+  # - sealed-ghcr-pull.yaml
+
+# Patch the dc-api ConfigMap with env-specific URLs.
+patches:
+  - target:
+      kind: ConfigMap
+      name: dc-api-config
+    patch: |-
+      - op: replace
+        path: /data/DCAPI_OIDC_ISSUER
+        value: "https://api.asgardeo.io/t/CHANGE-ME-asgardeo-org/oauth2/token"
+      - op: replace
+        path: /data/DCAPI_RANCHER_URL
+        value: "https://CHANGE-ME-rancher-hostname"
+      - op: replace
+        path: /data/DCAPI_BFF_REDIRECT_URL
+        value: "https://CHANGE-ME-dcapi-hostname/v1/auth/callback"
+      - op: replace
+        path: /data/DCAPI_BFF_POST_LOGIN_REDIRECT
+        value: "https://CHANGE-ME-cloud-ui-hostname/"
+      - op: replace
+        path: /data/DCAPI_BFF_POST_LOGOUT_REDIRECT
+        value: "https://CHANGE-ME-cloud-ui-hostname/"
+      - op: replace
+        path: /data/DCAPI_BFF_COOKIE_DOMAIN
+        value: ".CHANGE-ME-parent-domain"
+      - op: replace
+        path: /data/DCAPI_VPC_EXTERNAL_BRIDGE
+        value: "mgmt-br"
+      - op: replace
+        path: /data/DCAPI_VPC_EXTERNAL_CIDR
+        value: "CHANGE-ME-cidr"
+      - op: replace
+        path: /data/DCAPI_VPC_EXTERNAL_GATEWAY
+        value: "CHANGE-ME-gateway-ip"
+
+  # Patch the Ingress host. The TLS secret is provisioned by cert-manager
+  # via an Issuer the operator adds alongside this file (or by an external
+  # secret reference).
+  - target:
+      kind: Ingress
+      name: dc-api
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: "CHANGE-ME-dcapi-hostname"
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: "CHANGE-ME-dcapi-hostname"
+
+  # Point the ImageRepository at THIS operator's GHCR org so Flux watches
+  # their own image stream, not WSO2's canonical.
+  - target:
+      kind: ImageRepository
+      name: dc-api
+    patch: |-
+      - op: replace
+        path: /spec/image
+        value: "ghcr.io/CHANGE-ME-org/dc-api"

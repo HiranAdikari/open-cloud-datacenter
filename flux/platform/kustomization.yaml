@@ -1,0 +1,5 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - dc-api/base
+  # When you migrate cloud-ui / dc-webhook / kvi-operator, add them here.

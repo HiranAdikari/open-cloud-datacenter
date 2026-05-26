@@ -1,0 +1,22 @@
+# Cluster entrypoint #2: the dc-api platform.
+# Renders flux/platform/ into this cluster, with per-env patches from
+# this cluster's kustomization.yaml.
+#
+# Depends on infrastructure (cert-manager, ingress-nginx, sealed-secrets)
+# being healthy first.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./flux/clusters/CHANGE-ME-env-name
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: infrastructure
+  wait: true
+  timeout: 10m
