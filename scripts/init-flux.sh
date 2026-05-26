@@ -301,24 +301,27 @@ cmd_init() {
   fi
 
   echo "── values for env: $env_name ──"
-  ask  rancher_hostname  "Rancher hostname"                          ""                  "$HOSTNAME_RE"
-  ask  dcapi_hostname    "dc-api hostname"                           ""                  "$HOSTNAME_RE"
-  ask  cloudui_hostname  "cloud-ui hostname"                         ""                  "$HOSTNAME_RE"
+  echo "  (values marked ← from TF are auto-resolved; the rest get prompts)"
+  echo
+
+  auto_or_ask rancher_hostname    "Rancher hostname"          "bootstrap"        "rancher_hostname"  ""                  "$HOSTNAME_RE"
+  auto_or_ask dcapi_hostname      "dc-api hostname"           "dc-controlplane"  "dcapi_hostname"    ""                  "$HOSTNAME_RE"
+  auto_or_ask cloudui_hostname    "cloud-ui hostname"         "dc-controlplane"  "cloud_ui_hostname" ""                  "$HOSTNAME_RE"
 
   default_cookie_domain=".$(echo "$cloudui_hostname" | cut -d. -f2-)"
-  ask  bff_cookie_domain "BFF cookie domain (parent of cloud-ui+dc-api)" "$default_cookie_domain"
+  auto_or_ask bff_cookie_domain   "BFF cookie domain"         "dc-controlplane"  "bff_cookie_domain" "$default_cookie_domain"
 
-  ask  asgardeo_org      "Asgardeo org name"                         ""                  "$SLUG_RE"
-  ask  ghcr_org          "GHCR owner/org (your image stream)"        ""                  "$SLUG_RE"
-  ask  vpc_external_cidr     "VPC external CIDR (mgmt VLAN)"         "192.168.10.0/24"   "$CIDR_RE"
-  ask  vpc_external_gateway  "VPC external gateway"                  "192.168.10.254"    "$IP_RE"
-  ask  ocd_owner         "OCD repo owner (org/user)"                 "wso2"
-  ask  ocd_repo          "OCD repo name"                             "open-cloud-datacenter"
-  ask  ocd_ref           "OCD pin (tag like vX.Y.Z, or branch name)" "spike/flux-gitops"
-  ask  git_branch        "Consumer-repo branch Flux watches + commits bumps to"  "spike/flux-gitops"
-  ask  dc_api_tag        "Initial dc-api image tag (existing tag in your GHCR; image-automation will bump)"      "latest"
-  ask  cloud_ui_tag      "Initial cloud-ui image tag (existing tag in your GHCR; image-automation will bump)"    "latest"
-  ask  kvi_tag           "Initial keyvault-operator image tag (manual pin; bump by hand)"                        "v0.0.2"
+  auto_or_ask asgardeo_org        "Asgardeo org name"         "asgardeo-auth"    "asgardeo_org_name" ""                  "$SLUG_RE"
+  auto_or_ask ghcr_org            "GHCR owner/org"            "flux-bootstrap"   "ghcr_org"          ""                  "$SLUG_RE"
+  auto_or_ask vpc_external_cidr   "VPC external CIDR"         "dc-controlplane"  "vpc_external_cidr" "192.168.10.0/24"   "$CIDR_RE"
+  auto_or_ask vpc_external_gateway "VPC external gateway"     "dc-controlplane"  "vpc_external_gateway" "192.168.10.254" "$IP_RE"
+  auto_or_ask ocd_owner           "OCD repo owner"            "flux-bootstrap"   "ocd_owner"         "wso2"
+  auto_or_ask ocd_repo            "OCD repo name"             "flux-bootstrap"   "ocd_repo"          "open-cloud-datacenter"
+  auto_or_ask ocd_ref             "OCD pin (tag or branch)"   "flux-bootstrap"   "ocd_ref"           "spike/flux-gitops"
+  auto_or_ask git_branch          "Consumer-repo branch"      "flux-bootstrap"   "git_branch"        "spike/flux-gitops"
+  auto_or_ask dc_api_tag          "Initial dc-api image tag"  "flux-bootstrap"   "dc_api_initial_tag"           "latest"
+  auto_or_ask cloud_ui_tag        "Initial cloud-ui image tag" "flux-bootstrap"  "cloud_ui_initial_tag"         "latest"
+  auto_or_ask kvi_tag             "Initial keyvault-operator image tag" "flux-bootstrap" "keyvault_operator_initial_tag" "v0.0.2"
 
   # Tag-vs-branch heuristic for sources.yaml.
   if [[ "$ocd_ref" =~ ^v[0-9]+\.[0-9]+ ]]; then
