@@ -103,4 +103,13 @@ resource "flux_bootstrap_git" "this" {
   embedded_manifests = true
   path               = "flux/clusters/${var.env_name}"
   namespace          = "flux-system"
+
+  # Default `components` covers source/kustomize/helm/notification. We also
+  # need the two image-automation controllers to act on ImageRepository,
+  # ImagePolicy, and ImageUpdateAutomation CRs in the platform overlay —
+  # without them, image bumps never happen.
+  components_extra = [
+    "image-reflector-controller",
+    "image-automation-controller",
+  ]
 }
