@@ -70,8 +70,20 @@ target_dir="$consumer_dir/environments/$env_name/flux"
 
 if [[ -e "$target_dir" ]]; then
   if $force; then
-    echo "  ! --force given; overwriting $target_dir"
-    rm -rf "$target_dir"
+    echo "  ! --force given; overwriting wizard-managed files in $target_dir"
+    # ONLY remove the files this wizard generates. Preserve flux-system/
+    # (committed by Terraform's flux_bootstrap_git — wiping it would orphan
+    # Flux's root sync on the cluster) and any sealed-*.yaml from prior runs
+    # (operator may have edited them; we'll regen if --seal-secrets is set).
+    rm -f  "$target_dir/sources.yaml" \
+           "$target_dir/infrastructure.yaml" \
+           "$target_dir/platform.yaml" \
+           "$target_dir/image-update-automation.yaml" \
+           "$target_dir/README.md"
+    rm -rf "$target_dir/platform-overlay"
+    if $seal_secrets; then
+      rm -f "$target_dir"/sealed-*.yaml
+    fi
   else
     echo "✗ $target_dir already exists. Pass --force to overwrite." >&2
     exit 1
