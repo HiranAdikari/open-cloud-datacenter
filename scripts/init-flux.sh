@@ -100,9 +100,40 @@ ask() {
 
 ask_secret() {
   local var="$1" prompt="$2"
-  local input
-  read -r -s -p "  $prompt: " input
-  echo
+  local input=""
+  while [[ -z "$input" ]]; do
+    read -r -s -p "  $prompt: " input
+    echo
+    [[ -z "$input" ]] && echo "  ✗ value cannot be empty, try again" >&2
+  done
+  printf -v "$var" '%s' "$input"
+}
+
+# Prompts for a file path, expands `~`, and loops until the file exists.
+# Use for paths to existing files we'll read at seal time (kubeconfigs, PEM
+# certs). Catches the dead-of-typing case early instead of failing at the
+# bottom of the wizard.
+ask_file() {
+  local var="$1" prompt="$2" default="${3:-}"
+  local input=""
+  while true; do
+    if [[ -n "$default" ]]; then
+      read -r -p "  $prompt [$default]: " input
+      input="${input:-$default}"
+    else
+      read -r -p "  $prompt: " input
+    fi
+    # Expand leading ~ and ~user/. Use eval narrowly on the prefix only,
+    # not on the whole string (avoids globbing surprises elsewhere in the path).
+    case "$input" in
+      "~"|"~/"*) input="${HOME}${input#\~}" ;;
+      "~"*)      input="$(eval echo "${input%%/*}")${input#*/}" ;;
+    esac
+    if [[ -f "$input" ]]; then
+      break
+    fi
+    echo "  ✗ file not found: $input — try again" >&2
+  done
   printf -v "$var" '%s' "$input"
 }
 
@@ -138,7 +169,7 @@ if $seal_secrets; then
   echo "── secret values (sealed to cluster, never logged) ──"
   ask_secret rancher_admin_token       "Rancher admin token (from layer 02 output)"
   ask        harvester_cred_id         "Harvester cloud_credential_id (from layer 02-management output, e.g. cattle-global-data:cc-xxxxx)"
-  ask        harvester_kubeconfig_path "Path to Harvester kubeconfig file"
+  ask_file   harvester_kubeconfig_path "Path to Harvester kubeconfig file"
   ask_secret bff_client_id             "Asgardeo BFF client_id (cloud-ui-bff app, from layer 03 output)"
   ask_secret bff_client_secret         "Asgardeo BFF client_secret"
   ask_secret ghcr_pat                  "GHCR personal-access token (read:packages)"
@@ -147,16 +178,9 @@ if $seal_secrets; then
   echo "  Ingress TLS cert (covers $dcapi_hostname AND $cloudui_hostname)"
   ask  tls_source "  source: [s]elf-signed (generated now) | [b]yo (path to existing PEM files)" "s"
   if [[ "$tls_source" == "b" ]]; then
-    ask tls_crt_path "  Path to TLS cert PEM (full chain)"
-    ask tls_key_path "  Path to TLS key PEM"
-    [[ ! -f "$tls_crt_path" ]] && { echo "✗ cert not found: $tls_crt_path" >&2; exit 1; }
-    [[ ! -f "$tls_key_path" ]] && { echo "✗ key not found: $tls_key_path"  >&2; exit 1; }
+    ask_file tls_crt_path "  Path to TLS cert PEM (full chain)"
+    ask_file tls_key_path "  Path to TLS key PEM"
   fi
-
-  [[ ! -f "$harvester_kubeconfig_path" ]] && {
-    echo "✗ harvester kubeconfig not found at: $harvester_kubeconfig_path" >&2
-    exit 1
-  }
 fi
 
 # ── render template ──────────────────────────────────────────────────────────
