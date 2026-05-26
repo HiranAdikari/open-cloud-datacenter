@@ -18,6 +18,13 @@
 #
 # Equivalent to running `flux bootstrap github` by hand, but driven by
 # the wrapper script so the operator doesn't need the flux CLI installed.
+#
+# Auth mode: HTTPS + PAT.
+# Many datacenter networks block outbound port 22 (SSH) to github.com, so
+# deploy-key auth fails. HTTPS uses port 443 which is normally open. The
+# PAT becomes the persistent cluster-side credential (stored as a Secret
+# named flux-system in the flux-system namespace) — rotate by re-applying
+# this layer with a new token.
 
 terraform {
   required_version = ">= 1.7"
@@ -25,10 +32,6 @@ terraform {
     flux = {
       source  = "fluxcd/flux"
       version = "~> 1.4"
-    }
-    github = {
-      source  = "integrations/github"
-      version = "~> 6.3"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
@@ -58,48 +61,30 @@ locals {
 
 # Provider configs for the dcapi-controlplane cluster (via Rancher proxy).
 provider "kubernetes" {
-  host                   = local.dcapi_apiserver
-  token                  = data.terraform_remote_state.rancher_auth.outputs.admin_token
-  insecure               = true
-}
-
-provider "github" {
-  owner = var.github_owner
-  token = var.github_token
+  host     = local.dcapi_apiserver
+  token    = data.terraform_remote_state.rancher_auth.outputs.admin_token
+  insecure = true
 }
 
 provider "flux" {
   kubernetes = {
-    host                   = local.dcapi_apiserver
-    token                  = data.terraform_remote_state.rancher_auth.outputs.admin_token
-    insecure               = true
+    host     = local.dcapi_apiserver
+    token    = data.terraform_remote_state.rancher_auth.outputs.admin_token
+    insecure = true
   }
   git = {
-    url = "ssh://git@github.com/${var.github_owner}/${var.github_repository}.git"
-    ssh = {
-      username    = "git"
-      private_key = tls_private_key.flux.private_key_pem
+    url    = "https://github.com/${var.github_owner}/${var.github_repository}.git"
+    branch = var.git_branch
+    http = {
+      username = var.github_owner
+      password = var.github_token
     }
   }
 }
 
-# Deploy key Flux will use to push image-automation commits back to the fork.
-resource "tls_private_key" "flux" {
-  algorithm   = "ECDSA"
-  ecdsa_curve = "P256"
-}
-
-resource "github_repository_deploy_key" "flux" {
-  title      = "flux-${var.env_name}"
-  repository = var.github_repository
-  key        = tls_private_key.flux.public_key_openssh
-  read_only  = false # Flux Image Automation Controller commits manifest bumps.
-}
-
-# Install Flux components + write gotk-sync.yaml committed to flux/clusters/<env>/flux-system/.
+# Install Flux components + write gotk-sync.yaml committed to
+# flux/clusters/<env>/flux-system/ on the consumer fork.
 resource "flux_bootstrap_git" "this" {
-  depends_on = [github_repository_deploy_key.flux]
-
   embedded_manifests = true
   path               = "flux/clusters/${var.env_name}"
   namespace          = "flux-system"

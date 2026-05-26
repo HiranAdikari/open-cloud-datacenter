@@ -14,8 +14,14 @@ variable "github_repository" {
   default     = "open-cloud-datacenter"
 }
 
+variable "git_branch" {
+  description = "Branch Flux watches + commits gotk-sync.yaml to. Defaults to main; override to a feature branch when testing a spike."
+  type        = string
+  default     = "main"
+}
+
 variable "github_token" {
-  description = "GitHub personal-access token with repo scope. Used once during bootstrap to register Flux's deploy key on the fork. Not persisted in the cluster."
+  description = "GitHub PAT with repo scope. Used for HTTPS git auth — stored as a Secret in the flux-system namespace and re-used by Flux for every subsequent git operation (clone + push for image-automation). Rotate by re-applying this layer with a new token."
   type        = string
   sensitive   = true
 }
