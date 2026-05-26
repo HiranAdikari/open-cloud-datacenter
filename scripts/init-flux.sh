@@ -86,15 +86,30 @@ echo "  Seal secrets:  $seal_secrets"
 echo
 
 # ── prompt helpers ───────────────────────────────────────────────────────────
+# Every prompt loops until the user gives a value. Empty input with no
+# default is rejected with a clear message instead of silently accepted.
+# Empty input WITH a default is accepted (falls back to the default).
+
 ask() {
-  local var="$1" prompt="$2" default="${3:-}"
-  local input
-  if [[ -n "$default" ]]; then
-    read -r -p "  $prompt [$default]: " input
-    input="${input:-$default}"
-  else
-    read -r -p "  $prompt: " input
-  fi
+  local var="$1" prompt="$2" default="${3:-}" pattern="${4:-}"
+  local input=""
+  while true; do
+    if [[ -n "$default" ]]; then
+      read -r -p "  $prompt [$default]: " input
+      input="${input:-$default}"
+    else
+      read -r -p "  $prompt: " input
+    fi
+    if [[ -z "$input" ]]; then
+      echo "  ✗ value cannot be empty, try again" >&2
+      continue
+    fi
+    if [[ -n "$pattern" && ! "$input" =~ $pattern ]]; then
+      echo "  ✗ value doesn't match expected pattern ($pattern), try again" >&2
+      continue
+    fi
+    break
+  done
   printf -v "$var" '%s' "$input"
 }
 
@@ -123,6 +138,10 @@ ask_file() {
     else
       read -r -p "  $prompt: " input
     fi
+    if [[ -z "$input" ]]; then
+      echo "  ✗ value cannot be empty, try again" >&2
+      continue
+    fi
     # Expand leading ~ and ~user/. Use eval narrowly on the prefix only,
     # not on the whole string (avoids globbing surprises elsewhere in the path).
     case "$input" in
@@ -138,19 +157,27 @@ ask_file() {
 }
 
 # ── prompts ──────────────────────────────────────────────────────────────────
+# Lightweight regex validators reused below. Wrong by-typo is the common
+# failure mode (smushed ports, missing dots) — catching at prompt time is
+# infinitely better than catching at terraform-apply time.
+HOSTNAME_RE='^[a-zA-Z0-9.-]+$'
+IP_RE='^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+CIDR_RE='^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$'
+SLUG_RE='^[a-zA-Z0-9_-]+$'
+
 echo "── values for env: $env_name ──"
-ask  rancher_hostname  "Rancher hostname"
-ask  dcapi_hostname    "dc-api hostname"
-ask  cloudui_hostname  "cloud-ui hostname"
+ask  rancher_hostname  "Rancher hostname"                          ""                  "$HOSTNAME_RE"
+ask  dcapi_hostname    "dc-api hostname"                           ""                  "$HOSTNAME_RE"
+ask  cloudui_hostname  "cloud-ui hostname"                         ""                  "$HOSTNAME_RE"
 
 # Derive parent domain for BFF cookie sharing.
 default_cookie_domain=".$(echo "$cloudui_hostname" | cut -d. -f2-)"
 ask  bff_cookie_domain "BFF cookie domain (parent of cloud-ui+dc-api)" "$default_cookie_domain"
 
-ask  asgardeo_org      "Asgardeo org name"
-ask  ghcr_org          "GHCR owner/org (your image stream)"
-ask  vpc_external_cidr     "VPC external CIDR (mgmt VLAN)"        "192.168.10.0/24"
-ask  vpc_external_gateway  "VPC external gateway"                  "192.168.10.254"
+ask  asgardeo_org      "Asgardeo org name"                         ""                  "$SLUG_RE"
+ask  ghcr_org          "GHCR owner/org (your image stream)"        ""                  "$SLUG_RE"
+ask  vpc_external_cidr     "VPC external CIDR (mgmt VLAN)"         "192.168.10.0/24"   "$CIDR_RE"
+ask  vpc_external_gateway  "VPC external gateway"                  "192.168.10.254"    "$IP_RE"
 ask  ocd_owner         "OCD repo owner (org/user)"                 "wso2"
 ask  ocd_repo          "OCD repo name"                             "open-cloud-datacenter"
 ask  ocd_ref           "OCD pin (tag like vX.Y.Z, or branch name)" "spike/flux-gitops"
