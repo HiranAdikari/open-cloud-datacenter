@@ -120,7 +120,18 @@ ask  asgardeo_org      "Asgardeo org name"
 ask  ghcr_org          "GHCR owner/org (your image stream)"
 ask  vpc_external_cidr     "VPC external CIDR (mgmt VLAN)"        "192.168.10.0/24"
 ask  vpc_external_gateway  "VPC external gateway"                  "192.168.10.254"
-ask  ocd_ref           "OCD pin (tag or branch)"                   "spike/flux-gitops"
+ask  ocd_owner         "OCD repo owner (org/user)"                 "wso2"
+ask  ocd_repo          "OCD repo name"                             "open-cloud-datacenter"
+ask  ocd_ref           "OCD pin (tag like vX.Y.Z, or branch name)" "spike/flux-gitops"
+
+# Heuristic: a value matching ^v[0-9]+\.[0-9]+ is a release tag; anything
+# else is treated as a branch. Determines whether sources.yaml's
+# GitRepository.spec.ref uses `tag:` or `branch:`.
+if [[ "$ocd_ref" =~ ^v[0-9]+\.[0-9]+ ]]; then
+  ocd_ref_field="tag"
+else
+  ocd_ref_field="branch"
+fi
 
 if $seal_secrets; then
   echo
@@ -169,6 +180,8 @@ subst() {
     -e "s|CHANGE-ME-gateway|$vpc_external_gateway|g" \
     -e "s|CHANGE-ME-env|$env_name|g" \
     -e "s|ref=v0\\.9\\.0|ref=$ocd_ref|g" \
+    -e "s|github.com/wso2/open-cloud-datacenter|github.com/$ocd_owner/$ocd_repo|g" \
+    -e "s|    tag: v0\\.9\\.0|    $ocd_ref_field: $ocd_ref|g" \
     "$src" > "$dst"
   echo "  wrote $dst"
 }
