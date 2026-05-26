@@ -11,9 +11,8 @@ resources:
   # uncomments them automatically.
   # - ../sealed-dc-postgres-secret.yaml
   # - ../sealed-dc-api-secrets.yaml
-  # - ../sealed-ghcr-pull-secret-dc-system.yaml
-  # - ../sealed-ghcr-pull-secret-dc-webhook.yaml
-  # - ../sealed-dc-api-webhook-secrets.yaml
+  # - ../sealed-dc-api-tls.yaml
+  # - ../sealed-ghcr-pull-secret.yaml
 
 # Per-env values patched into the shared base.
 patches:
@@ -65,16 +64,9 @@ patches:
         path: /spec/tls/0/hosts/0
         value: "CHANGE-ME-cloud-ui-hostname"
 
-  # Patch the dc-webhook MutatingWebhookConfiguration's webhook name so the
-  # FQDN doesn't collide if a second consumer ever runs in the same cluster.
-  - target: { kind: MutatingWebhookConfiguration, name: dc-api-ovn-mac-webhook }
-    patch: |-
-      - op: replace
-        path: /webhooks/0/name
-        value: "virtualmachines.kubevirt.io.dc-api.CHANGE-ME-parent-domain"
-
   # Point each app's ImageRepository at THIS consumer's GHCR org so Flux
   # watches their own image streams, not WSO2's canonical.
+  # (dc-webhook lives on Harvester via TF, not here.)
   - target: { kind: ImageRepository, name: dc-api }
     patch: |-
       - op: replace
@@ -85,11 +77,6 @@ patches:
       - op: replace
         path: /spec/image
         value: "ghcr.io/CHANGE-ME-org/cloud-ui"
-  - target: { kind: ImageRepository, name: dc-api-webhook }
-    patch: |-
-      - op: replace
-        path: /spec/image
-        value: "ghcr.io/CHANGE-ME-org/dc-api-webhook"
   - target: { kind: ImageRepository, name: keyvault-operator }
     patch: |-
       - op: replace

@@ -27,20 +27,24 @@ stop between any two layers, inspect, and resume.
 ## The flow at a glance
 
 ```
-┌─ TERRAFORM ─────────────────────────────────────────┐
+┌─ TERRAFORM (Harvester host cluster) ────────────────┐
 │  layer 00  bootstrap        Rancher VM on Harvester │
 │  layer 01  rancher-auth     admin token             │
 │  layer 02  management       Harvester → Rancher     │
+│              + namespace-credential-provisioner     │
+│              + KubeOVN install + external network   │ ← NEW (modules/management/kubeovn)
 │  layer 03  asgardeo-auth    OIDC apps on IdP        │
-│  layer 02  dc-controlplane  3-node RKE2 cluster     │
-│  layer 06  flux-bootstrap   Flux installed,         │
+│  layer 04  dc-controlplane  3-node RKE2 cluster     │
+│  layer 05  dc-operators     dc-webhook on Harvester │ ← stays TF (Harvester-side)
+│  layer 06  flux-bootstrap   Flux on dcapi-cluster   │
 │                             pointed at this repo    │
 └─────────────────────┬───────────────────────────────┘
                       │
-                      │  Flux Source Controller polls every 1m,
-                      │  picks up commits to environments/<env>/flux/
+                      │  Flux Source Controller (on dcapi-controlplane-rke2)
+                      │  polls every 1m, picks up commits to
+                      │  environments/<env>/flux/
                       ▼
-┌─ FLUX ──────────────────────────────────────────────┐
+┌─ FLUX (dcapi-controlplane-rke2 cluster) ────────────┐
 │  STAGE A: infrastructure                            │
 │   - sealed-secrets controller                       │
 │   - cert-manager                                    │
@@ -53,10 +57,41 @@ stop between any two layers, inspect, and resume.
 │   - dc-postgres                                     │
 │   - dc-api                                          │
 │   - cloud-ui                                        │
-│   - dc-webhook                                      │
 │   - keyvault-operator                               │
 └─────────────────────────────────────────────────────┘
 ```
+
+## Two cluster targets, two ownership models
+
+Cluster | Owner | What lives here
+---|---|---
+**Harvester host** (`harvester-dev` kubectl context) | Terraform | KubeOVN, namespace-credential-provisioner, dc-webhook (intercepts KubeVirt VM admission — only meaningful on Harvester), Harvester networks/storage
+**dcapi-controlplane-rke2** (RKE2 cluster running INSIDE Harvester as VMs) | Flux | dc-api, cloud-ui, dc-postgres, keyvault-operator, the in-cluster add-ons (sealed-secrets, cert-manager, ingress-nginx)
+
+dc-webhook does NOT live in Flux. Its `MutatingWebhookConfiguration`
+intercepts `kubevirt.io/VirtualMachine` admission, and KubeVirt only
+runs on the Harvester host cluster. The TF module
+`modules/management/dc-webhook` already hand-rolls its TLS via the
+`hashicorp/tls` provider (no cert-manager dependency on the Harvester
+side).
+
+## ARC retirement
+
+Today, ARC (Actions Runner Controller) runs ephemeral GitHub runners
+inside the dcapi-controlplane cluster, and CI does `kubectl set image`
+through them. Under the Flux model:
+
+- CI builds + pushes container images to GHCR (any runner — including
+  GitHub-hosted — works; no in-cluster runners needed).
+- Flux Image Automation Controller watches GHCR and updates the
+  Deployment manifest. Pod rolls.
+- The `kubectl set image` path is dead.
+
+ARC stays in the cluster only if the consumer keeps using it for
+out-of-band tasks (e.g. running other CI jobs that need privileged
+in-cluster access). If you keep it, the existing `dc-api-deployer`
+ServiceAccount + Role + RoleBinding in `dc-system` won't auto-survive
+Flux's `prune: true` — re-add them to your platform-overlay if needed.
 
 ---
 

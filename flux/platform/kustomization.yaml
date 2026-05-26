@@ -4,5 +4,9 @@ resources:
   - dc-api/base
   - dc-postgres/base
   - cloud-ui/base
-  - dc-webhook/base
   - keyvault-operator/base
+# dc-webhook is NOT here. It runs on the Harvester host cluster (intercepts
+# kubevirt.io VirtualMachine admission, which only lives on Harvester) and
+# is installed by the TF `02-dc-operators` layer via the OCD
+# modules/management/dc-webhook module. Don't move it to Flux unless we
+# also set up a second Flux instance targeting Harvester.

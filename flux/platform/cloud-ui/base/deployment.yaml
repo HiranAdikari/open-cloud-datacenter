@@ -22,13 +22,17 @@ spec:
         - name: cloud-ui
           # Bumped by Flux Image Automation. Overlay patches the registry org.
           image: ghcr.io/wso2/cloud-ui:v0.9.0 # {"$imagepolicy": "flux-system:cloud-ui"}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: [ALL] }
+            # nginx briefly opens privileged sockets during worker setup
+            # before dropping to uid 101. Pod-level runAsNonRoot: true would
+            # cause PSA to reject; container-level false overrides that.
+            runAsNonRoot: false
           livenessProbe:
             httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 5
