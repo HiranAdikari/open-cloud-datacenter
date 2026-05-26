@@ -232,6 +232,55 @@ IP_RE='^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
 CIDR_RE='^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$'
 SLUG_RE='^[a-zA-Z0-9_-]+$'
 
+# ── tf output auto-resolve ───────────────────────────────────────────────────
+# Pull values straight from existing terraform outputs so the operator doesn't
+# re-type things terraform already knows (admin_token, BFF client_id, etc.).
+# Falls back to interactive prompt when the output isn't there.
+
+# resolve_layer_dir: maps bare layer name ("rancher-auth") to actual dir path
+# under $consumer_dir/environments/$env_name/. Matches tf.sh behaviour.
+resolve_layer_dir() {
+  local layer="$1"
+  local env_dir="$consumer_dir/environments/$env_name"
+  [[ -d "$env_dir/$layer" ]] && { echo "$env_dir/$layer"; return; }
+  find "$env_dir" -maxdepth 1 -type d -name "*-${layer}" 2>/dev/null | sort | head -1
+}
+
+# tf_get: echo the raw value of an output from a layer; empty if missing.
+tf_get() {
+  local layer="$1" out_name="$2"
+  local dir
+  dir="$(resolve_layer_dir "$layer")"
+  [[ -z "$dir" ]] && return
+  (cd "$dir" && terraform output -raw "$out_name" 2>/dev/null) || true
+}
+
+# auto_or_ask: use terraform output if present, else prompt.
+auto_or_ask() {
+  local var="$1" prompt="$2" layer="$3" out_name="$4" default="${5:-}" pattern="${6:-}"
+  local tf_val
+  tf_val="$(tf_get "$layer" "$out_name")"
+  if [[ -n "$tf_val" ]]; then
+    printf -v "$var" '%s' "$tf_val"
+    echo "  ✓ $prompt  ← from TF ($layer.$out_name)"
+    return
+  fi
+  ask "$var" "$prompt" "$default" "$pattern"
+}
+
+# auto_or_ask_secret: same but masks the display (never echoes the value).
+auto_or_ask_secret() {
+  local var="$1" prompt="$2" layer="$3" out_name="$4"
+  local tf_val
+  tf_val="$(tf_get "$layer" "$out_name")"
+  if [[ -n "$tf_val" ]]; then
+    printf -v "$var" '%s' "$tf_val"
+    echo "  ✓ $prompt  ← from TF ($layer.$out_name) [sensitive, not displayed]"
+    return
+  fi
+  ask_secret "$var" "$prompt"
+}
+
 # ── subcommand: init ─────────────────────────────────────────────────────────
 cmd_init() {
   if [[ -e "$overlay_dir/kustomization.yaml" ]]; then
@@ -374,17 +423,31 @@ cmd_seal() {
   default_cloudui=$(grep -oE '"cloud\.[a-zA-Z0-9.-]+"' "$overlay_dir/kustomization.yaml" 2>/dev/null | head -1 | tr -d '"' || true)
 
   echo "── secret values (sealed to cluster, never logged) ──"
+  echo "  (values marked ← from TF are auto-resolved; the rest get prompts)"
+  echo
+
+  # Hostnames: not in TF outputs today (Stage 2 work). Default from rendered
+  # files so re-running seal doesn't require retyping.
   ask  dcapi_hostname               "dc-api hostname (for TLS SAN)"      "${default_dcapi:-}"   "$HOSTNAME_RE"
   ask  cloudui_hostname             "cloud-ui hostname (for TLS SAN)"    "${default_cloudui:-}" "$HOSTNAME_RE"
-  ask  ghcr_org                     "GHCR owner/org (for image-pull dockerconfigjson)"  ""     "$SLUG_RE"
-  ask_secret rancher_admin_token    "Rancher admin token (from layer 02 output)"
-  ask        harvester_cred_id      "Harvester cloud_credential_id (e.g. cattle-global-data:cc-xxxxx)"
+
+  # GHCR org: not in TF (operator decision). Default grep'd from overlay's
+  # ImageRepository patches so the operator doesn't re-type.
+  local default_ghcr_org
+  default_ghcr_org=$(grep -oE 'ghcr\.io/[a-zA-Z0-9_-]+/dc-api' "$overlay_dir/kustomization.yaml" 2>/dev/null | head -1 | cut -d/ -f2)
+  ask  ghcr_org                     "GHCR owner/org (for image-pull dockerconfigjson)"  "${default_ghcr_org:-}"     "$SLUG_RE"
+
+  # These come straight from terraform outputs — no typing.
+  auto_or_ask_secret rancher_admin_token    "Rancher admin token"               "rancher-auth"   "admin_token"
+  auto_or_ask        harvester_cred_id      "Harvester cloud_credential_id"     "management"     "cloud_credential_id"
+  auto_or_ask_secret bff_client_id          "Asgardeo BFF client_id"            "asgardeo-auth"  "bff_client_id"
+  auto_or_ask_secret bff_client_secret      "Asgardeo BFF client_secret"        "asgardeo-auth"  "bff_client_secret"
+  auto_or_ask        rancher_oidc_client_id "Asgardeo rancher-sso client_id"    "asgardeo-auth"  "client_id"
+  auto_or_ask        cloud_ui_client_id     "Asgardeo cloud-ui SPA client_id"   "asgardeo-auth"  "cloud_ui_client_id"
+
+  # Cluster-only / operator-only — stay prompts.
   ask_file   harvester_kubeconfig_path "Path to Harvester kubeconfig file"
-  ask_secret bff_client_id          "Asgardeo BFF client_id"
-  ask_secret bff_client_secret      "Asgardeo BFF client_secret"
-  ask  rancher_oidc_client_id       "Asgardeo rancher-sso client_id"
-  ask  cloud_ui_client_id           "Asgardeo cloud-ui SPA client_id"
-  ask_secret ghcr_pat               "GHCR personal-access token (read:packages)"
+  ask_secret ghcr_pat                  "GHCR personal-access token (read:packages)"
 
   echo
   echo "  Ingress TLS cert (covers $dcapi_hostname AND $cloudui_hostname)"
