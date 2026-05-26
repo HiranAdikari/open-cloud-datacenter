@@ -13,6 +13,10 @@ spec:
   # Placeholder — overlay patches to ghcr.io/<owner>/dc-api.
   image: ghcr.io/wso2/dc-api
   interval: 5m
+  # Pull credentials for scanning private GHCR packages. The wizard's
+  # --seal-secrets path drops this Secret into flux-system.
+  secretRef:
+    name: ghcr-pull-secret
 ---
 apiVersion: image.toolkit.fluxcd.io/v1beta2
 kind: ImagePolicy
@@ -22,8 +26,11 @@ metadata:
 spec:
   imageRepositoryRef:
     name: dc-api
+  # Accepts both bare 40-char commit SHAs (today's wso2 CI tag format) and
+  # `main-<short-sha>` (Flux-native semver-ish alternative used by some
+  # downstream forks). Override in your overlay if your CI tags differently.
   filterTags:
-    pattern: '^main-(?P<sha>[a-f0-9]{7,})$'
+    pattern: '^(?P<sha>[a-f0-9]{7,40})$'
     extract: '$sha'
   policy:
     alphabetical:

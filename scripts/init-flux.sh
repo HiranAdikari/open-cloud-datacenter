@@ -186,10 +186,22 @@ subst() {
   echo "  wrote $dst"
 }
 
+ask  git_branch        "Consumer-repo branch Flux watches + commits bumps to"  "spike/flux-gitops"
+
 subst "$template_dir/sources.yaml"          "$target_dir/sources.yaml"
 subst "$template_dir/infrastructure.yaml"   "$target_dir/infrastructure.yaml"
 subst "$template_dir/platform.yaml"         "$target_dir/platform.yaml"
 subst "$template_dir/platform-overlay/kustomization.yaml" "$target_dir/platform-overlay/kustomization.yaml"
+
+# Image Update Automation — bumps Deployment image tags in-place + commits
+# back to this repo. Needs the env name + branch substituted into the
+# placeholders.
+sed \
+  -e "s|CHANGE-ME-env|$env_name|g" \
+  -e "s|CHANGE-ME-git-branch|$git_branch|g" \
+  -e "s|CHANGE-ME-parent-domain|${bff_cookie_domain#.}|g" \
+  "$template_dir/image-update-automation.yaml" > "$target_dir/image-update-automation.yaml"
+echo "  wrote $target_dir/image-update-automation.yaml"
 
 # Consumer-side README (not a copy of the OCD template's own README —
 # that one is meant for someone READING the template upstream; this one
@@ -324,9 +336,11 @@ if $seal_secrets; then
        --from-literal=DCAPI_BFF_SESSION_SECRET="$bff_session_secret" \
        --from-file=DCAPI_HARVESTER_KUBECONFIG="$harvester_kubeconfig_path"
 
-  # GHCR image-pull secret. Only dc-system needs it now (dc-webhook lives
-  # on Harvester via TF, not in this Flux setup).
-  seal_dockerconfig sealed-ghcr-pull-secret.yaml ghcr-pull-secret dc-system "$ghcr_org" "$ghcr_pat"
+  # GHCR image-pull secret. Two namespaces:
+  #  - dc-system: used by Deployments' imagePullSecrets to fetch private images
+  #  - flux-system: used by ImageRepository CRs to scan private GHCR for new tags
+  seal_dockerconfig sealed-ghcr-pull-secret.yaml             ghcr-pull-secret dc-system    "$ghcr_org" "$ghcr_pat"
+  seal_dockerconfig sealed-ghcr-pull-secret-flux-system.yaml ghcr-pull-secret flux-system  "$ghcr_org" "$ghcr_pat"
 
   # dc-api-tls — the Secret both Ingresses (dc-api + cloud-ui) reference.
   # Either generate self-signed with both hostnames in SANs, or seal an
@@ -374,6 +388,7 @@ if $seal_secrets; then
       print "  - ../sealed-dc-api-secrets.yaml"
       print "  - ../sealed-dc-api-tls.yaml"
       print "  - ../sealed-ghcr-pull-secret.yaml"
+      print "  - ../sealed-ghcr-pull-secret-flux-system.yaml"
       skip = 1
       next
     }
