@@ -192,7 +192,58 @@ else
 fi
 
 if $seal_secrets; then
+  # ── prereq check BEFORE any prompt ──
+  # Fail fast if KUBECONFIG / kubectl / kubeseal / the sealed-secrets
+  # controller aren't ready. The user shouldn't have to type 7 secrets
+  # only to be told at the end "oh by the way KUBECONFIG isn't set".
   echo
+  echo "── seal-secrets prereq check ──"
+  fail=0
+
+  for cmd in kubectl kubeseal openssl; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+      echo "  ✓ $cmd"
+    else
+      echo "  ✗ $cmd not on PATH" >&2
+      fail=1
+    fi
+  done
+
+  current_ctx="$(kubectl config current-context 2>/dev/null || true)"
+  if [[ -z "$current_ctx" ]]; then
+    echo "  ✗ no current kubectl context (run: kubectl config use-context <dcapi-controlplane-context>)" >&2
+    fail=1
+  else
+    echo "  ✓ kubectl context: $current_ctx"
+    if ! kubectl get namespace sealed-secrets >/dev/null 2>&1; then
+      echo "  ✗ namespace 'sealed-secrets' not found in context '$current_ctx'." >&2
+      echo "    Is this the dcapi-controlplane cluster? Has Flux Stage A (infrastructure) finished?" >&2
+      echo "    Try: kubectl --context=$current_ctx get kustomization -A" >&2
+      fail=1
+    else
+      if ! kubectl --namespace=sealed-secrets get deploy sealed-secrets-controller >/dev/null 2>&1; then
+        echo "  ✗ sealed-secrets-controller Deployment not found in 'sealed-secrets' ns." >&2
+        echo "    Has Flux finished installing the infrastructure HelmReleases?" >&2
+        fail=1
+      else
+        ready_replicas=$(kubectl --namespace=sealed-secrets get deploy sealed-secrets-controller -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
+        if [[ "${ready_replicas:-0}" -lt 1 ]]; then
+          echo "  ✗ sealed-secrets-controller has $ready_replicas ready replicas — wait for it to come up." >&2
+          fail=1
+        else
+          echo "  ✓ sealed-secrets-controller is Ready ($ready_replicas replicas)"
+        fi
+      fi
+    fi
+  fi
+
+  if [[ "$fail" -ne 0 ]]; then
+    echo
+    echo "✗ Prereq check failed — fix the items above and re-run." >&2
+    exit 1
+  fi
+  echo
+
   echo "── secret values (sealed to cluster, never logged) ──"
   ask_secret rancher_admin_token       "Rancher admin token (from layer 02 output)"
   ask        harvester_cred_id         "Harvester cloud_credential_id (from layer 02-management output, e.g. cattle-global-data:cc-xxxxx)"
@@ -305,12 +356,12 @@ README
 echo "  wrote $target_dir/README.md"
 
 # ── seal secrets ─────────────────────────────────────────────────────────────
+# (prereqs were checked at the top of the seal-secrets block — kubectl,
+# kubeseal, current context, sealed-secrets controller all verified before
+# we asked for any secret values).
 if $seal_secrets; then
   echo
   echo "── sealing secrets ──"
-  : "${KUBECONFIG:?KUBECONFIG must be set and pointed at dcapi-controlplane}"
-  command -v kubeseal >/dev/null || { echo "✗ kubeseal not on PATH" >&2; exit 1; }
-  command -v kubectl  >/dev/null || { echo "✗ kubectl not on PATH"  >&2; exit 1; }
 
   cert_pem="$(mktemp)"
   trap 'rm -f "$cert_pem"' EXIT
