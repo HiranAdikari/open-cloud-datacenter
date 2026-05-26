@@ -125,10 +125,17 @@ ask  ocd_ref           "OCD pin (tag or branch)"                   "spike/flux-g
 if $seal_secrets; then
   echo
   echo "── secret values (sealed to cluster, never logged) ──"
-  ask_secret asgardeo_m2m_secret    "Asgardeo M2M client secret"
-  ask_secret rancher_admin_token    "Rancher admin token"
-  ask_secret ghcr_pat               "GHCR personal-access token"
-  ask        harvester_kubeconfig_path "Path to Harvester kubeconfig (will be base64'd)"
+  ask_secret rancher_admin_token       "Rancher admin token (from layer 02 output)"
+  ask        harvester_cred_id         "Harvester cloud_credential_id (from layer 02-management output, e.g. cattle-global-data:cc-xxxxx)"
+  ask        harvester_kubeconfig_path "Path to Harvester kubeconfig file"
+  ask_secret bff_client_id             "Asgardeo BFF client_id (cloud-ui-bff app, from layer 03 output)"
+  ask_secret bff_client_secret         "Asgardeo BFF client_secret"
+  ask_secret ghcr_pat                  "GHCR personal-access token (read:packages)"
+
+  [[ ! -f "$harvester_kubeconfig_path" ]] && {
+    echo "✗ harvester kubeconfig not found at: $harvester_kubeconfig_path" >&2
+    exit 1
+  }
 fi
 
 # ── render template ──────────────────────────────────────────────────────────
@@ -228,9 +235,20 @@ if $seal_secrets; then
     > "$cert_pem"
   echo "  ✓ fetched sealed-secrets controller cert"
 
+  # Generate locally-random values so re-runs don't rotate them.
+  # The user can edit + re-seal manually if rotation IS desired.
+  postgres_password="$(openssl rand -hex 12)"
+  bff_session_secret="$(openssl rand -base64 32)"
+
+  # Compose the DCAPI_OIDC_AUDIENCE list from the three Asgardeo client IDs.
+  # Wizard already has bff_client_id; the rancher-sso client_id + cloud-ui SPA
+  # client_id come from layer 04 (asgardeo-auth) outputs. Asked here once.
+  ask  rancher_oidc_client_id  "Asgardeo rancher-sso client_id (from layer 03 output)"
+  ask  cloud_ui_client_id      "Asgardeo cloud-ui SPA client_id (from layer 03 output)"
+  oidc_audience="$rancher_oidc_client_id,$bff_client_id,$cloud_ui_client_id"
+
   seal() {
     local name="$1" namespace="$2"; shift 2
-    # remaining args = --from-literal=k=v pairs
     kubectl create secret generic "$name" \
       --namespace="$namespace" \
       --dry-run=client -o yaml \
@@ -244,27 +262,78 @@ if $seal_secrets; then
     echo "  wrote sealed-$name.yaml"
   }
 
-  seal asgardeo-m2m   dc-system \
-       --from-literal=client_secret="$asgardeo_m2m_secret"
-  seal rancher-token  dc-system \
-       --from-literal=token="$rancher_admin_token"
-  seal ghcr-pull      dc-system \
-       --from-literal=.dockerconfigjson="$(printf '{"auths":{"ghcr.io":{"username":"%s","password":"%s","auth":"%s"}}}' \
-            "$ghcr_org" "$ghcr_pat" "$(printf '%s:%s' "$ghcr_org" "$ghcr_pat" | base64)")"
-  seal harvester-kubeconfig dc-webhook \
+  # Filename suffix so the same secret name in two namespaces produces two
+  # different files on disk (sealed-secrets-controller distinguishes by
+  # namespace, but the filesystem doesn't).
+  seal_dockerconfig() {
+    local filename="$1" name="$2" namespace="$3" username="$4" pat="$5"
+    kubectl create secret docker-registry "$name" \
+      --namespace="$namespace" \
+      --docker-server=ghcr.io \
+      --docker-username="$username" \
+      --docker-password="$pat" \
+      --dry-run=client -o yaml \
+    | kubeseal \
+        --cert "$cert_pem" \
+        --format yaml \
+        --namespace="$namespace" \
+        --name="$name" \
+    > "$target_dir/$filename"
+    echo "  wrote $filename"
+  }
+
+  # Postgres password (consumed by the dc-postgres StatefulSet).
+  seal dc-postgres-secret dc-system \
+       --from-literal=password="$postgres_password"
+
+  # dc-api's main env Secret. Composite — every DCAPI_* env var that's
+  # sensitive lives in this single Secret, mounted via envFrom in the
+  # Deployment.
+  seal dc-api-secrets dc-system \
+       --from-literal=DCAPI_DB_URL="postgres://dc_api:${postgres_password}@dc-postgres.dc-system:5432/dc_api?sslmode=disable" \
+       --from-literal=DCAPI_OIDC_AUDIENCE="$oidc_audience" \
+       --from-literal=DCAPI_RANCHER_TOKEN="$rancher_admin_token" \
+       --from-literal=DCAPI_RANCHER_HARVESTER_CREDENTIAL="$harvester_cred_id" \
+       --from-literal=DCAPI_OPERATOR_SSH_KEY="" \
+       --from-literal=DCAPI_OPERATOR_PASSWORD="" \
+       --from-literal=DCAPI_BFF_CLIENT_ID="$bff_client_id" \
+       --from-literal=DCAPI_BFF_CLIENT_SECRET="$bff_client_secret" \
+       --from-literal=DCAPI_BFF_SESSION_SECRET="$bff_session_secret" \
+       --from-file=DCAPI_HARVESTER_KUBECONFIG="$harvester_kubeconfig_path"
+
+  # GHCR image-pull secret. dc-system + dc-webhook both pull from GHCR;
+  # one per namespace, distinct filenames.
+  seal_dockerconfig sealed-ghcr-pull-secret-dc-system.yaml  ghcr-pull-secret dc-system  "$ghcr_org" "$ghcr_pat"
+  seal_dockerconfig sealed-ghcr-pull-secret-dc-webhook.yaml ghcr-pull-secret dc-webhook "$ghcr_org" "$ghcr_pat"
+
+  # dc-webhook needs Harvester kubeconfig in its own Secret (different env
+  # var name than dc-api's — DCWEBHOOK_KUBECONFIG vs DCAPI_HARVESTER_KUBECONFIG).
+  seal dc-api-webhook-secrets dc-webhook \
        --from-file=DCWEBHOOK_KUBECONFIG="$harvester_kubeconfig_path"
 
-  # Uncomment the sealed-secret references in kustomization.yaml.
-  # Read-only sed -> redirect to a temp -> mv. No -i on macOS.
+  # Rewrite the sealed-secret block in platform-overlay/kustomization.yaml
+  # so it references the sealed-*.yaml files we just produced. awk's output
+  # goes to a temp file then mv'd into place — never sed -i (banned on macOS
+  # because BSD sed silently truncates).
   local_ks="$target_dir/platform-overlay/kustomization.yaml"
-  sed \
-    -e 's|^  # - ../sealed-asgardeo-m2m.yaml|  - ../sealed-asgardeo-m2m.yaml|' \
-    -e 's|^  # - ../sealed-rancher-token.yaml|  - ../sealed-rancher-token.yaml|' \
-    -e 's|^  # - ../sealed-ghcr-pull.yaml|  - ../sealed-ghcr-pull.yaml|' \
-    -e 's|^  # - ../sealed-harvester-kubeconfig.yaml|  - ../sealed-harvester-kubeconfig.yaml|' \
-    "$local_ks" > "$local_ks.new"
+  awk '
+    /^  # Sealed secrets the wizard drops/ {
+      print "  # Sealed secrets generated by scripts/init-flux.sh --seal-secrets."
+      print "  - ../sealed-dc-postgres-secret.yaml"
+      print "  - ../sealed-dc-api-secrets.yaml"
+      print "  - ../sealed-ghcr-pull-secret-dc-system.yaml"
+      print "  - ../sealed-ghcr-pull-secret-dc-webhook.yaml"
+      print "  - ../sealed-dc-api-webhook-secrets.yaml"
+      skip = 1
+      next
+    }
+    /^[^ ]/ { skip = 0 }
+    skip && /^  # - / { next }
+    skip && /^  - \.\./ { next }
+    { print }
+  ' "$local_ks" > "$local_ks.new"
   mv "$local_ks.new" "$local_ks"
-  echo "  ✓ uncommented sealed-secret resources in kustomization.yaml"
+  echo "  ✓ rewired sealed-secret references in kustomization.yaml"
 fi
 
 # ── done ─────────────────────────────────────────────────────────────────────
