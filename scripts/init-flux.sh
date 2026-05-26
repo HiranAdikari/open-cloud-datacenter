@@ -315,6 +315,9 @@ subst() {
     -e "s|CHANGE-ME-cidr|$vpc_external_cidr|g" \
     -e "s|CHANGE-ME-gateway|$vpc_external_gateway|g" \
     -e "s|CHANGE-ME-env|$env_name|g" \
+    -e "s|CHANGE-ME-dc-api-tag|$dc_api_tag|g" \
+    -e "s|CHANGE-ME-cloud-ui-tag|$cloud_ui_tag|g" \
+    -e "s|CHANGE-ME-kvi-operator-tag|$kvi_tag|g" \
     -e "s|ref=v0\\.9\\.0|ref=$ocd_ref|g" \
     -e "s|github.com/wso2/open-cloud-datacenter|github.com/$ocd_owner/$ocd_repo|g" \
     -e "s|    tag: v0\\.9\\.0|    $ocd_ref_field: $ocd_ref|g" \
@@ -323,6 +326,13 @@ subst() {
 }
 
 ask  git_branch        "Consumer-repo branch Flux watches + commits bumps to"  "spike/flux-gitops"
+
+# Initial image tags. Image Update Automation will bump dc-api + cloud-ui
+# to newer SHA-style tags it finds in your registry; kvi-operator stays
+# manually pinned (its semver tags don't match the SHA policy filter).
+ask  dc_api_tag      "Initial dc-api image tag (existing tag in your GHCR; image-automation will bump)"      "latest"
+ask  cloud_ui_tag    "Initial cloud-ui image tag (existing tag in your GHCR; image-automation will bump)"    "latest"
+ask  kvi_tag         "Initial keyvault-operator image tag (manual pin; bump by hand)"                          "v0.0.2"
 
 subst "$template_dir/sources.yaml"          "$target_dir/sources.yaml"
 subst "$template_dir/infrastructure.yaml"   "$target_dir/infrastructure.yaml"
