@@ -130,22 +130,35 @@ verifying the new flow.
 
 ### 3. (Re-)apply the base infra layers
 
-Standard sequence — nothing new here:
+Standard sequence:
 
 ```bash
-cd environments/<env>/00-bootstrap        && terraform apply
-cd ../01-rancher-auth                     && terraform apply
-cd ../02-management                       && terraform apply
-cd ../03-asgardeo-auth                    && terraform apply
-cd ../02-dc-controlplane                  && terraform apply
+cd environments/<env>/00-bootstrap                && terraform apply
+cd ../01-rancher-auth                             && terraform apply
+cd ../02-management                               && terraform apply   # ← see KubeOVN note below
+cd ../03-asgardeo-auth                            && terraform apply
+cd ../02-dc-controlplane                          && terraform apply
+cd ../02-dc-operators                             && terraform apply   # ← dc-webhook on Harvester (kept as TF)
 ```
+
+**KubeOVN note for layer 02-management:** the new
+`modules/management/kubeovn` module should be wired into this layer
+alongside the existing `harvester-integration` + `namespace-credential-provisioner`
+calls. If KubeOVN is already installed on the cluster (lk-dev case —
+hand-installed manually), set `manage_kubeovn_install = false` in the
+module call so TF doesn't try to install a second copy. See the
+module's README for the brownfield-import recipe to adopt the existing
+Helm release + ProviderNetwork + Vlan + Subnet resources.
 
 At the end you have:
 - Rancher running
 - Harvester registered into Rancher
+- KubeOVN installed + external ProviderNetwork/Vlan/Subnet ready
 - OIDC apps registered on Asgardeo (rancher-sso, cloud-ui SPA,
   cloud-ui-bff confidential)
 - `dcapi-controlplane-rke2` cluster Ready (3 nodes if HA)
+- dc-webhook running on the Harvester host cluster (intercepts
+  KubeVirt VirtualMachine admission)
 
 ### 4. Render the Flux overlay (without secrets)
 
@@ -226,10 +239,19 @@ Then re-run the wizard with `--seal-secrets`:
 
 The wizard:
 - Fetches the sealed-secrets controller's public cert from the cluster.
-- Generates random Postgres + BFF-session secrets.
-- Seals 5 secrets (`dc-postgres-secret`, `dc-api-secrets`,
-  `ghcr-pull-secret` × 2 for dc-system + dc-webhook namespaces,
-  `dc-api-webhook-secrets`).
+- Generates random Postgres password + BFF session secret locally
+  (re-runs do NOT rotate them — manual edit + re-seal if rotation is
+  wanted).
+- Prompts for the TLS source for `dc-api-tls`: `[s]elf-signed`
+  (wizard runs openssl, 1yr cert with both Ingress hostnames in SANs)
+  or `[b]yo` (paths to existing PEM files).
+- Seals 4 secrets:
+  - `dc-postgres-secret` — postgres password
+  - `dc-api-secrets` — composite (DCAPI_DB_URL, OIDC_AUDIENCE,
+    RANCHER_TOKEN, RANCHER_HARVESTER_CREDENTIAL, OPERATOR_*,
+    BFF_CLIENT_ID/SECRET/SESSION_SECRET, HARVESTER_KUBECONFIG)
+  - `dc-api-tls` — `kubernetes.io/tls` Secret both Ingresses reference
+  - `ghcr-pull-secret` — dockerconfigjson for GHCR pulls
 - Drops them as `sealed-*.yaml` next to the overlay.
 - Rewrites `platform-overlay/kustomization.yaml` to reference them.
 
@@ -244,16 +266,21 @@ git push
 ### 8. Watch Stage B come up
 
 ```bash
+# Against dcapi-controlplane-rke2 (KUBECONFIG already set from step 6)
 kubectl --namespace=flux-system get kustomizations -w
-# ... wait for "platform" to flip to Ready ...
+# wait for "platform" to flip to Ready
 
 kubectl --namespace=dc-system get pods -w
 # dc-postgres-0     Running
 # dc-api-xxxxx      Running
 # cloud-ui-xxxxx    Running
 
-kubectl --namespace=dc-webhook get pods
 kubectl --namespace=keyvault-system get pods
+# keyvault-controller-manager-xxxxx  Running
+
+# dc-webhook lives on the HARVESTER host cluster (different kubeconfig):
+KUBECONFIG=<harvester-kubeconfig> kubectl --namespace=dc-webhook get pods
+# dc-api-webhook-xxxxx  Running
 ```
 
 ### 9. Verify
