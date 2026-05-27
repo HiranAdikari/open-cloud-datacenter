@@ -1,14 +1,17 @@
-output "kv_namespace" {
-  value       = kubernetes_namespace.keyvault_system.metadata[0].name
-  description = "Namespace the keyvault-operator controller is deployed into."
+# Per-sub-module pass-through outputs. Null when the operator is
+# disabled — consumers can `try()` or `coalesce()` to detect.
+
+output "keyvault_namespace" {
+  description = "Namespace the keyvault operator was deployed into. Null when enable_keyvault = false."
+  value       = var.enable_keyvault ? module.keyvault[0].kv_namespace : null
 }
 
-output "kv_deployment_name" {
-  value       = kubernetes_deployment.keyvault_controller_manager.metadata[0].name
-  description = "Name of the keyvault-operator controller-manager Deployment."
+output "keyvault_deployment_name" {
+  description = "Name of the keyvault operator Deployment. Null when enable_keyvault = false."
+  value       = var.enable_keyvault ? module.keyvault[0].kv_deployment_name : null
 }
 
-output "kv_image" {
-  value       = "${var.kv_image}:${var.kv_image_tag}"
-  description = "Fully-qualified image reference (registry/image:tag) used by the keyvault-operator Deployment."
+output "keyvault_image" {
+  description = "Fully-qualified image:tag actually applied for the keyvault operator. Null when enable_keyvault = false."
+  value       = var.enable_keyvault ? module.keyvault[0].kv_image : null
 }

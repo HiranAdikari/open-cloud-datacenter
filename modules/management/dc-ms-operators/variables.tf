@@ -1,65 +1,71 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# dc-ms-operators module — inputs
+# dc-ms-operators umbrella — inputs
 #
-# Variables shared across all managed-service operator controllers deployed
-# by this module. Per-operator variables are prefixed (e.g. kv_*) so the
-# namespace stays clean when DB, cache, and registry operators are added.
-# ─────────────────────────────────────────────────────────────────────────────
+# Per-operator toggles let consumers pick à-la-carte:
+#   - Consumers that run dc-api + cloudui MUST enable every operator
+#     dc-api expects to dispatch CRs to (today: keyvault).
+#   - Consumers that just want a single operator on their harvester
+#     (no dc-api) set enable_<other> = false.
+#
+# Per-operator config is flat (prefixed). Adding a new operator =
+# new `enable_<name>` + `<name>_*` vars here + a new sub-module
+# directory + a new `module "<name>"` block in main.tf.
 
-# ── Keyvault operator ─────────────────────────────────────────────────────────
-
-variable "kv_namespace" {
-  type        = string
-  description = "Namespace the keyvault-operator controller runs in. Must exist or be created by this module (default: 'keyvault-system')."
-  default     = "keyvault-system"
+# ── keyvault ─────────────────────────────────────────────────────────────────
+variable "enable_keyvault" {
+  type        = bool
+  description = "Deploy the keyvault operator. Required when consumer also runs dc-api+cloudui (dc-api dispatches KeyVaultBackend/KeyVaultInstance CRs to it)."
+  default     = true
 }
 
-variable "kv_image" {
+variable "keyvault_image" {
   type        = string
-  description = "Container image registry path for the keyvault-operator, without a tag (e.g. 'ghcr.io/hiranadikari/keyvault-operator')."
+  description = "Image (no tag) for the keyvault operator. e.g. ghcr.io/<org>/keyvault-operator."
   default     = "ghcr.io/hiranadikari/keyvault-operator"
 }
 
-variable "kv_image_tag" {
+variable "keyvault_image_tag" {
   type        = string
-  description = "Pinned image tag for the keyvault-operator. Never 'latest' — a fixed tag ensures plan output is deterministic and rollback is possible."
+  description = "Pinned tag for the keyvault operator image. Bump deliberately on operator releases."
   default     = "v0.0.1"
 }
 
-# ── GHCR image pull credentials (optional) ────────────────────────────────────
-# Both must be set together. If either is empty the pull secret is skipped and
-# the Deployment has no imagePullSecrets — suitable for clusters that already
-# have cluster-level registry credentials or when the image is public.
+variable "keyvault_namespace" {
+  type        = string
+  description = "Namespace to deploy the keyvault operator into."
+  default     = "keyvault-system"
+}
+
+variable "keyvault_enable_metrics_network_policy" {
+  type        = bool
+  description = "Apply NetworkPolicy gating metrics traffic to Prometheus pods only."
+  default     = false
+}
+
+variable "keyvault_enable_prometheus_servicemonitor" {
+  type        = bool
+  description = "Apply the ServiceMonitor CR for Prometheus scraping. Requires Prometheus Operator CRDs on the target cluster."
+  default     = false
+}
+
+variable "keyvault_enable_cert_manager_metrics" {
+  type        = bool
+  description = "Wire cert-manager to issue a TLS cert for the operator's metrics endpoint. Requires cert-manager on the target cluster."
+  default     = false
+}
+
+# ── shared image-pull cred ───────────────────────────────────────────────────
+# All current sub-modules pull from the same ghcr.io org. If a future
+# operator pulls from elsewhere, split these into per-operator vars.
 
 variable "ghcr_username" {
   type        = string
-  description = "GitHub username for pulling images from ghcr.io. Set together with ghcr_pat to create a 'ghcr-pull-secret' in each operator namespace. Leave empty for public images or clusters with pre-existing registry credentials."
-  default     = ""
+  description = "GitHub username for ghcr.io image pulls. Leave null if operator images are public."
+  default     = null
 }
 
 variable "ghcr_pat" {
   type        = string
+  description = "GitHub PAT with read:packages scope. Leave null if operator images are public."
   sensitive   = true
-  description = "GitHub Personal Access Token with read:packages scope. Required when ghcr_username is set. Stored as a kubernetes.io/dockerconfigjson Secret in the operator namespace."
-  default     = ""
-}
-
-# ── Optional feature toggles ──────────────────────────────────────────────────
-
-variable "enable_metrics_network_policy" {
-  type        = bool
-  description = "When true, creates a NetworkPolicy restricting /metrics (port 8443) ingress to namespaces labelled 'metrics: enabled'. Mirrors config/network-policy/allow-metrics-traffic.yaml. Off by default to match the kustomize/default baseline where the network-policy resource is commented out. Enable when the cluster has NetworkPolicy enforcement (Calico/Cilium)."
-  default     = false
-}
-
-variable "enable_prometheus_servicemonitor" {
-  type        = bool
-  description = "When true, creates a ServiceMonitor (monitoring.coreos.com/v1) that points Prometheus at the controller-manager metrics Service. Requires the Prometheus Operator CRDs to be installed on the target cluster (e.g. via kube-prometheus-stack). Off by default to avoid a hard dependency on the Prometheus Operator."
-  default     = false
-}
-
-variable "enable_cert_manager_metrics" {
-  type        = bool
-  description = "When true, mounts the cert-manager-issued 'metrics-server-cert' Secret into the manager container and adds --metrics-cert-path, enabling TLS on the /metrics endpoint. Also updates the ServiceMonitor tlsConfig when enable_prometheus_servicemonitor is true. Requires cert-manager to be installed and to have issued a Certificate named 'metrics-certs' in the keyvault namespace."
-  default     = false
+  default     = null
 }
