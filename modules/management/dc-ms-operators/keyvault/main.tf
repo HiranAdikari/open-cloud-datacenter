@@ -9,9 +9,9 @@
 # All provider config (kubernetes host + credentials) lives in the calling
 # environment layer. This module only contains resource definitions.
 #
-# Source: crds/keyvault/config/ in the sovereign-cloud repo
-#   (github.com/HiranAdikari/sovereign-cloud). The canonical deployment
-#   command is `kustomize build crds/keyvault/config/default | kubectl apply`.
+# Source: the keyvault-operator's `config/` directory (kubebuilder
+#   layout) in the upstream source repo. The canonical deployment
+#   command is `kustomize build config/default | kubectl apply`.
 #   This module re-expresses that output as typed Terraform resources so the
 #   same cluster state is managed idiomatically without requiring kustomize at
 #   apply time.

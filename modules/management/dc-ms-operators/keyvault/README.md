@@ -8,8 +8,8 @@ any sub-module extraction.
 
 ## Source of truth
 
-This module derives from `crds/keyvault/config/` in the sovereign-cloud
-monorepo (`github.com/HiranAdikari/sovereign-cloud`). The canonical
+This module derives from the keyvault-operator's `config/` directory
+(kubebuilder layout) in the upstream source repo. The canonical
 deployment path is:
 
 ```bash
@@ -116,7 +116,7 @@ module "ms_operators" {
     kubernetes = kubernetes.dcapi_cluster
   }
 
-  kv_image     = "ghcr.io/hiranadikari/keyvault-operator"
+  kv_image     = "ghcr.io/wso2/keyvault-operator"
   kv_image_tag = "v0.1.0"
   ghcr_username = var.ghcr_username
   ghcr_pat      = var.ghcr_pat
@@ -133,7 +133,7 @@ module "ms_operators" {
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `kv_namespace` | `string` | `"keyvault-system"` | Namespace the keyvault-operator runs in |
-| `kv_image` | `string` | `"ghcr.io/hiranadikari/keyvault-operator"` | Image registry path, no tag |
+| `kv_image` | `string` | `"ghcr.io/wso2/keyvault-operator"` | Image registry path, no tag |
 | `kv_image_tag` | `string` | `"v0.0.1"` | Pinned image tag |
 | `ghcr_username` | `string` | `""` | GHCR username; leave empty to skip pull secret |
 | `ghcr_pat` | `string` (sensitive) | `""` | GHCR PAT; leave empty to skip pull secret |
@@ -170,7 +170,7 @@ output, exactly as `dc-controlplane-services` does today.
 |---|---|---|
 | `managed-by: kustomize` | `managed-by: terraform` | Reflects actual deployment tool |
 | `imagePullSecrets` always absent | Conditional on `ghcr_username`+`ghcr_pat` | Allows pull-secret injection without altering the canonical YAML |
-| Image `ghcr.io/hiranadikari/keyvault-operator:v0.0.1` | `var.kv_image:var.kv_image_tag` | Caller-controlled; not pinned in module |
+| Image `ghcr.io/wso2/keyvault-operator:v0.0.1` | `var.kv_image:var.kv_image_tag` | Caller-controlled; not pinned in module |
 | `kvi-manager-role` rules: no `namespaces` resource | `namespaces` added | KVI controller creates per-tenant namespaces; this is an intentional addition to the kubebuilder scaffold |
 | `memory: 128Mi` limit (canonical) | `128Mi` | Aligned with canonical; prior module had 256Mi |
 | NetworkPolicy: commented out in kustomize | Optional via `enable_metrics_network_policy` | Preserves kustomize default (off) while making it available |

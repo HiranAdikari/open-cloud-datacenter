@@ -20,7 +20,7 @@ variable "enable_keyvault" {
 variable "keyvault_image" {
   type        = string
   description = "Image (no tag) for the keyvault operator. e.g. ghcr.io/<org>/keyvault-operator."
-  default     = "ghcr.io/hiranadikari/keyvault-operator"
+  default     = "ghcr.io/wso2/keyvault-operator"
 }
 
 variable "keyvault_image_tag" {

@@ -16,7 +16,7 @@ operators that `dc-api` dispatches custom resources to. Today: just
 | Variable | Type | Default | Notes |
 |---|---|---|---|
 | `enable_keyvault` | bool | `true` | Toggle the keyvault sub-module |
-| `keyvault_image` | string | `ghcr.io/hiranadikari/keyvault-operator` | Image, no tag |
+| `keyvault_image` | string | `ghcr.io/wso2/keyvault-operator` | Image, no tag |
 | `keyvault_image_tag` | string | `v0.0.1` | Pinned tag |
 | `keyvault_namespace` | string | `keyvault-system` | |
 | `keyvault_enable_metrics_network_policy` | bool | `false` | Optional NetworkPolicy |
@@ -82,4 +82,4 @@ module "dc_ms_operators" {
 |---|---|
 | `harvester-integration` | Independent. Both target the Harvester cluster but operate on different namespaces. `harvester-integration` is the prerequisite (provisions Rancher cloud cred + namespace-credential-provisioner); `dc-ms-operators` runs on top of an already-integrated Harvester cluster. |
 | `dc-controlplane-services` | Independent and runs on a different cluster (dcapi-controlplane). `dc-api` there dispatches CRs to the operators deployed here. |
-| `dc-webhook` | Same cluster (Harvester). Bundled in the same consumer layer typically (`02-dc-operators` in the lk-dev environment). |
+| `dc-webhook` | Same cluster (Harvester). Bundled in the same consumer layer typically (the `dc-operators` layer in each environment). |

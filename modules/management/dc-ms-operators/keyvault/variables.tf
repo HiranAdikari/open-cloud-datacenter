@@ -16,8 +16,8 @@ variable "kv_namespace" {
 
 variable "kv_image" {
   type        = string
-  description = "Container image registry path for the keyvault-operator, without a tag (e.g. 'ghcr.io/hiranadikari/keyvault-operator')."
-  default     = "ghcr.io/hiranadikari/keyvault-operator"
+  description = "Container image registry path for the keyvault-operator, without a tag (e.g. 'ghcr.io/wso2/keyvault-operator')."
+  default     = "ghcr.io/wso2/keyvault-operator"
 }
 
 variable "kv_image_tag" {
