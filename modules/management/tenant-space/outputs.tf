@@ -41,5 +41,5 @@ output "gateway_ip" {
 output "vm_access_kubeconfig" {
   value       = local.vm_access_kubeconfig
   sensitive   = true
-  description = "Namespace-scoped Harvester kubeconfig for the tenant team. Non-null when expose_vm_kubeconfig = true and the namespace-credential-provisioner has already created the secret. Hand to the tenant team once at onboarding. See examples/consumer-workloads in wso2-datacenter-project for usage."
+  description = "Namespace-scoped Harvester kubeconfig for the tenant team. Non-null when expose_vm_kubeconfig = true and the namespace-credential-provisioner has already created the secret. Hand to the tenant team once at onboarding. See the consumer-workloads examples for usage."
 }

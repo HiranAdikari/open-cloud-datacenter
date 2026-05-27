@@ -15,8 +15,8 @@ flux/
 ```
 
 OCD does **not** ship a concrete cluster overlay. Each consumer keeps
-their own per-environment overlay in their own repo (e.g.
-`wso2-datacenter-project/environments/lk-dev/flux/`).
+their own per-environment overlay in their own repo (path convention:
+`<consumer-repo>/environments/<env>/flux/`).
 
 The consumer's overlay pulls these shared bits as a Kustomize remote
 base pinned to an OCD release tag:

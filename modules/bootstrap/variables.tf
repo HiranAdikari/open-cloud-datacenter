@@ -166,7 +166,7 @@ variable "vm_password" {
 
 variable "rancher_hostname" {
   type        = string
-  description = "FQDN for the Rancher UI (e.g. 'rancher-lk-prod.wso2.com')"
+  description = "FQDN for the Rancher UI (e.g. 'rancher.example.com')"
 }
 
 variable "bootstrap_password" {

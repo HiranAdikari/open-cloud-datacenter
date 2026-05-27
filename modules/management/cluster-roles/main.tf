@@ -256,7 +256,7 @@ resource "rancher2_role_template" "cluster_operator" {
 #   - Any cluster-level write access (pair separately with vm-creator cluster binding)
 #
 # NOTE: The management.cattle.io API rules below are the R&D candidate set.
-# Validate on lk-dev before promoting: confirm namespace creation succeeds,
+# Validate on a dev env before promoting: confirm namespace creation succeeds,
 # then confirm project quota edit and project delete return 403.
 resource "rancher2_role_template" "project_contributor" {
   name        = "project-contributor"

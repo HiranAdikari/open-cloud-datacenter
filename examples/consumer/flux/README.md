@@ -4,7 +4,7 @@ Copy this directory into your consumer repo at a per-env path that
 matches your existing layout. Example:
 
 ```bash
-cp -r examples/consumer/flux/ ~/path/to/my-consumer-repo/environments/lk-dev/flux/
+cp -r examples/consumer/flux/ ~/path/to/my-consumer-repo/environments/<env>/flux/
 ```
 
 Then:

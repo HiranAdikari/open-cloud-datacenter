@@ -115,8 +115,7 @@ variable "ghcr_pat" {
 
 variable "github_repo_url" {
   type        = string
-  description = "GitHub repository URL the ARC runner registers against."
-  default     = "https://github.com/HiranAdikari/sovereign-cloud"
+  description = "GitHub repository URL the ARC runner registers against — must be the SOURCE repo that owns the CI workflows (`runs-on: dc-runner`), not the consumer/Flux-state repo. Consumers set this in tfvars; no module default."
 }
 
 variable "github_runner_pat" {
@@ -221,7 +220,7 @@ variable "bff_post_logout_redirect" {
 
 variable "bff_cookie_domain" {
   type        = string
-  description = "Cookie domain scope for BFF session cookies (e.g. '.lk-dev.internal.wso2.com'). Projected as DCAPI_BFF_COOKIE_DOMAIN."
+  description = "Cookie domain scope for BFF session cookies (e.g. '.dev.example.com'). Projected as DCAPI_BFF_COOKIE_DOMAIN."
   default     = ""
 }
 

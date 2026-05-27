@@ -121,7 +121,7 @@ resource "kubernetes_manifest" "vlan_external" {
 # ── Subnet (the ovn-vpc-external-network) ────────────────────────────────────
 # dc-api allocates per-tenant VPC EIPs from this subnet at runtime via the
 # kubeovn provisioner. The NAD that wraps this subnet is created by dc-api
-# (so the wso2-datacenter-project layer doesn't need to manage it).
+# (so the consumer layer doesn't need to manage it).
 resource "kubernetes_manifest" "subnet_external" {
   manifest = {
     apiVersion = "kubeovn.io/v1"

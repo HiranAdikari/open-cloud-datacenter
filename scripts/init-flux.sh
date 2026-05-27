@@ -477,20 +477,15 @@ cmd_init() {
   # patch. THIS IS THE SOURCE REPO WHERE CI WORKFLOWS LIVE — not the
   # consumer/Flux state repo. ARC registers runners per-repo; a
   # workflow in repo-A whose `runs-on: dc-runner` won't match a
-  # runner registered to repo-B. The kvi-operator / dc-api / cloud-ui
-  # workflows all live in HiranAdikari/sovereign-cloud, so the runner
-  # has to register there.
+  # runner registered to repo-B.
   #
-  # We default to HiranAdikari/sovereign-cloud as the spike-phase
-  # source repo. When the spike merges to OCD / new consumers stand
-  # up, override these two prompts to point at the appropriate source
-  # repo.
+  # No defaults — every consumer's source repo is different (or merged
+  # into OCD post-spike). Operator supplies both.
   echo
   echo "  ℹ  ARC runner repo: the SOURCE repo where your CI workflows live"
   echo "     (.github/workflows/*.yaml). NOT the consumer/Flux-state repo."
-  echo "     For the spike: HiranAdikari/sovereign-cloud."
-  ask runner_github_owner "GitHub owner of the SOURCE repo (where workflows live)" "HiranAdikari" "$SLUG_RE"
-  ask runner_github_repo  "GitHub repo name of the SOURCE repo"                   "sovereign-cloud" "$SLUG_RE"
+  ask runner_github_owner "GitHub owner of the SOURCE repo (where workflows live)" "" "$SLUG_RE"
+  ask runner_github_repo  "GitHub repo name of the SOURCE repo"                   "" "$SLUG_RE"
   auto_or_ask dc_api_tag          "Initial dc-api image tag"  "flux-bootstrap"   "dc_api_initial_tag"           "latest"
   auto_or_ask cloud_ui_tag        "Initial cloud-ui image tag" "flux-bootstrap"  "cloud_ui_initial_tag"         "latest"
   # keyvault-operator image tag is set by the TF module that deploys

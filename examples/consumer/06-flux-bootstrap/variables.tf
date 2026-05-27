@@ -1,5 +1,5 @@
 variable "env_name" {
-  description = "Environment slug used as the directory name under flux/clusters/. E.g. 'lk-dev', 'customer-prod-eu'."
+  description = "Environment slug used as the directory name under flux/clusters/. E.g. 'dev', 'staging', 'customer-prod-eu'."
   type        = string
 }
 

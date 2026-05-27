@@ -91,7 +91,7 @@ module "kubeovn" {
 
 ## Brownfield import (existing manual install)
 
-For clusters where KubeOVN was already installed by hand (the lk-dev case)
+For clusters where KubeOVN was already installed by hand (brownfield case)
 the Helm release and the three CRs already exist. Import each before the
 first apply so TF adopts them instead of replacing them:
 
