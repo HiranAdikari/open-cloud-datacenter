@@ -345,36 +345,65 @@ git_commit_push() {
       return 1
     fi
 
-    # If nothing changed under $path, skip silently.
-    if [[ -z "$(git status --porcelain -- "$path" 2>/dev/null)" ]]; then
-      echo "  ✓ no changes under $path — nothing to commit"
-      return 0
-    fi
-
-    git add -- "$path"
-
-    # `git add` on an unchanged file is a no-op; only commit if the index
-    # actually differs from HEAD.
-    if git diff --cached --quiet -- "$path"; then
-      echo "  ✓ index matches HEAD — nothing to commit"
+    # Stage + commit any new changes under $path.
+    if [[ -n "$(git status --porcelain -- "$path" 2>/dev/null)" ]]; then
+      git add -- "$path"
+      if git diff --cached --quiet -- "$path"; then
+        echo "  ✓ working tree under $path matches index — nothing to commit"
+      else
+        git commit -m "$message" >/dev/null
+        echo "  ✓ committed: $message"
+      fi
     else
-      git commit -m "$message" >/dev/null
-      echo "  ✓ committed: $message"
+      echo "  ✓ no working-tree changes under $path"
     fi
 
-    # Explicit refspec form. Bypasses push.default surprises (the
-    # 'upstream branch of your current branch does not match the name of
-    # your current branch' error happens when push.default=simple sees a
-    # tracking ref with a different name than local HEAD). HEAD:refs/heads/X
-    # tells git unambiguously: push my current commit to branch X on origin.
-    if git push -u "$git_remote" "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
-      echo "  ✓ pushed to $git_remote/$branch"
+    # Now check whether local is ahead of remote. This matters even when
+    # the wizard didn't make changes this run — a prior run may have
+    # committed locally but the operator never pushed. Flux then
+    # reconciles a stale remote SHA that's missing the overlay, and
+    # nothing deploys. We fetch the remote ref so the ahead-count is
+    # accurate (silently — a failed fetch shouldn't break the wizard).
+    git fetch "$git_remote" "$branch" >/dev/null 2>&1 || true
+
+    local ahead
+    if git rev-parse --verify --quiet "$git_remote/$branch" >/dev/null; then
+      ahead=$(git rev-list --count "$git_remote/$branch..HEAD" 2>/dev/null || echo 0)
     else
-      echo "  ✗ push to $git_remote/$branch failed" >&2
-      echo "    retry by hand:" >&2
-      echo "      cd $consumer_dir && git push -u $git_remote HEAD:refs/heads/$branch" >&2
-      return 1
+      ahead="new-branch"
     fi
+
+    case "$ahead" in
+      0)
+        echo "  ✓ $git_remote/$branch already at HEAD — nothing to push"
+        ;;
+      new-branch)
+        if git push -u "$git_remote" "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
+          echo "  ✓ pushed (created $git_remote/$branch)"
+        else
+          echo "  ✗ push to $git_remote/$branch failed" >&2
+          echo "    retry: cd $consumer_dir && git push -u $git_remote HEAD:refs/heads/$branch" >&2
+          return 1
+        fi
+        ;;
+      *)
+        # Explicit refspec form. Bypasses push.default surprises (the
+        # 'upstream branch of your current branch does not match the
+        # name of your current branch' error happens when
+        # push.default=simple sees a tracking ref with a different name
+        # than local HEAD). HEAD:refs/heads/X tells git unambiguously:
+        # push my current commit to branch X on origin.
+        if git push -u "$git_remote" "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
+          echo "  ✓ pushed $ahead commit(s) to $git_remote/$branch"
+        else
+          echo "  ✗ push to $git_remote/$branch failed ($ahead local commits ahead)" >&2
+          echo "    likely a fast-forward conflict — pull first:" >&2
+          echo "      cd $consumer_dir && git pull --rebase $git_remote $branch" >&2
+          echo "    then re-run this wizard subcommand" >&2
+          return 1
+        fi
+        ;;
+    esac
   )
 }
 
@@ -504,11 +533,18 @@ README
     "Add Flux overlay for $env_name (init phase)"
 
   echo
-  echo "  Then:"
-  echo "    1. ./tf.sh apply --region $env_name --layer flux-bootstrap"
-  echo "    2. wait for infrastructure Kustomization Ready:"
-  echo "         kubectl get kustomization -n flux-system -w"
-  echo "    3. $0 seal --consumer-dir $consumer_dir --env-name $env_name"
+  echo "  Flux will reconcile the new revision on its next interval"
+  echo "  (~1 min). The first thing to come up is the infrastructure"
+  echo "  Kustomization, which installs sealed-secrets + cert-manager"
+  echo "  + ingress-nginx via OCD's flux/infrastructure path."
+  echo
+  echo "  Wait for it:"
+  echo "    kubectl get kustomization -n flux-system -w"
+  echo "  When 'infrastructure' shows True, run seal:"
+  echo "    $0 seal --consumer-dir $consumer_dir --env-name $env_name"
+  echo
+  echo "  (tf.sh apply 06-flux-bootstrap is a one-time prereq before"
+  echo "   the first init — not something to re-run after every init.)"
 }
 
 # ── subcommand: seal ─────────────────────────────────────────────────────────
