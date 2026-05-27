@@ -614,12 +614,34 @@ cmd_seal() {
   auto_or_ask        cloud_ui_client_id     "Asgardeo cloud-ui SPA client_id"   "asgardeo-auth"  "cloud_ui_client_id"
 
   # Cluster-only / operator-only — stay prompts.
+
+  echo
+  echo "  ℹ  Harvester kubeconfig: the file you used in TF for the 00-bootstrap"
+  echo "     layer. Typically: <consumer-repo>/environments/<env>/00-bootstrap/harvester.kubeconfig"
   ask_file   harvester_kubeconfig_path "Path to Harvester kubeconfig file"
+
+  echo
+  echo "  ℹ  GHCR pull-token: classic GitHub PAT for pulling the consumer's"
+  echo "     images from ghcr.io. Generate at:"
+  echo "       https://github.com/settings/tokens (classic)  →  scope: read:packages"
+  echo "     Used by dc-system, flux-system, keyvault-system to pull images."
   ask_secret ghcr_pat                  "GHCR personal-access token (read:packages)"
+
+  echo
+  echo "  ℹ  Runner PAT: SEPARATE classic GitHub PAT for the ARC self-hosted runner"
+  echo "     to register itself on the consumer repo. Generate at:"
+  echo "       https://github.com/settings/tokens (classic)  →  scope: repo"
+  echo "     Kept separate from the GHCR PAT for least-privilege: the runner PAT"
+  echo "     can register/deregister runners + read issues; the pull PAT only reads packages."
   ask_secret runner_pat                "GitHub PAT for ARC runner registration (repo scope)"
 
   echo
-  echo "  Ingress TLS cert (covers $dcapi_hostname AND $cloudui_hostname)"
+  echo "  ℹ  Ingress TLS cert (covers both $dcapi_hostname and $cloudui_hostname)"
+  echo "     [s]elf-signed: wizard generates a 1-year cert now. Browsers will warn"
+  echo "       — fine for internal envs. The cert is stored only as a sealed-secret."
+  echo "     [b]yo: provide paths to existing fullchain.pem + privkey.pem (e.g. from"
+  echo "       Let's Encrypt or a corporate CA). The cert must list both hostnames"
+  echo "       as SANs (subject alt names)."
   ask  tls_source "  source: [s]elf-signed (generated now) | [b]yo (path to existing PEM files)" "s"
   if [[ "$tls_source" == "b" ]]; then
     ask_file tls_crt_path "  Path to TLS cert PEM (full chain)"
