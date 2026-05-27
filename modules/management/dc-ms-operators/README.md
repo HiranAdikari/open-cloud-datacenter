@@ -6,31 +6,85 @@ DB, cache, and registry operators are added here as additional resource
 blocks when those operators are ready — the module grows inline before
 any sub-module extraction.
 
+## Source of truth
+
+This module derives from `crds/keyvault/config/` in the sovereign-cloud
+monorepo (`github.com/HiranAdikari/sovereign-cloud`). The canonical
+deployment path is:
+
+```bash
+kubectl kustomize crds/keyvault/config/default | kubectl apply -f -
+# or equivalently:
+make deploy   # in crds/keyvault/
+```
+
+The kustomize build entry point is `crds/keyvault/config/default/kustomization.yaml`.
+The `namePrefix: kvi-` directive applies to all generated resource names.
+This module re-expresses every resource in that canonical output as typed
+Terraform so the same cluster state is managed without requiring kustomize
+at apply time.
+
+## How to refresh from upstream
+
+When the operator releases a new version:
+
+1. Rebuild the canonical output:
+   ```bash
+   kubectl kustomize crds/keyvault/config/default
+   ```
+2. Diff each resource (by `kind` + `name`) against the corresponding TF
+   resource block in `main.tf`. Common drift areas:
+   - New or changed RBAC rules in the manager ClusterRole
+   - New container args from patches
+   - Memory/CPU limit changes
+   - New ports or volume mounts
+3. Update the CRD YAML files under `crds/` alongside the operator image
+   tag bump — CRD schema changes must travel with the image version.
+4. Bump `kv_image_tag` in the consumer's `terraform.tfvars`.
+
 ## What it deploys (keyvault-operator)
+
+Resource names below are the post-`kvi-`-prefix names that appear on the
+cluster. These match `kubectl kustomize crds/keyvault/config/default`.
 
 | Resource | Name | Kind |
 |---|---|---|
 | Namespace | `keyvault-system` (var) | `Namespace` |
 | CRD | `keyvaultbackends.keyvault.opencloud.wso2.com` | `CustomResourceDefinition` |
 | CRD | `keyvaultinstances.keyvault.opencloud.wso2.com` | `CustomResourceDefinition` |
-| ServiceAccount | `keyvault-controller-manager` | `ServiceAccount` |
-| Role | `keyvault-leader-election-role` | `Role` (namespaced) |
-| RoleBinding | `keyvault-leader-election-rolebinding` | `RoleBinding` (namespaced) |
-| ClusterRole | `keyvault-manager-role` | `ClusterRole` |
-| ClusterRoleBinding | `keyvault-manager-rolebinding` | `ClusterRoleBinding` |
-| ClusterRole | `keyvault-metrics-auth-role` | `ClusterRole` |
-| ClusterRoleBinding | `keyvault-metrics-auth-rolebinding` | `ClusterRoleBinding` |
-| ClusterRole | `keyvault-metrics-reader` | `ClusterRole` |
-| Deployment | `keyvault-controller-manager` | `Deployment` |
-| Service | `keyvault-operator-metrics` | `Service` (port 8443) |
+| ServiceAccount | `kvi-controller-manager` | `ServiceAccount` |
+| Role | `kvi-leader-election-role` | `Role` (namespaced) |
+| RoleBinding | `kvi-leader-election-rolebinding` | `RoleBinding` (namespaced) |
+| ClusterRole | `kvi-manager-role` | `ClusterRole` |
+| ClusterRoleBinding | `kvi-manager-rolebinding` | `ClusterRoleBinding` |
+| ClusterRole | `kvi-metrics-auth-role` | `ClusterRole` |
+| ClusterRoleBinding | `kvi-metrics-auth-rolebinding` | `ClusterRoleBinding` |
+| ClusterRole | `kvi-metrics-reader` | `ClusterRole` |
+| ClusterRole | `kvi-keyvaultbackend-admin-role` | `ClusterRole` (helper) |
+| ClusterRole | `kvi-keyvaultbackend-editor-role` | `ClusterRole` (helper) |
+| ClusterRole | `kvi-keyvaultbackend-viewer-role` | `ClusterRole` (helper) |
+| ClusterRole | `kvi-keyvaultinstance-admin-role` | `ClusterRole` (helper) |
+| ClusterRole | `kvi-keyvaultinstance-editor-role` | `ClusterRole` (helper) |
+| ClusterRole | `kvi-keyvaultinstance-viewer-role` | `ClusterRole` (helper) |
+| Service | `kvi-controller-manager-metrics-service` | `Service` (port 8443/HTTPS) |
+| Deployment | `kvi-controller-manager` | `Deployment` |
 | Secret (optional) | `ghcr-pull-secret` | `kubernetes.io/dockerconfigjson` |
+
+Optional resources (gated by boolean variables):
+
+| Resource | Name | Controlled by |
+|---|---|---|
+| NetworkPolicy | `kvi-allow-metrics-traffic` | `enable_metrics_network_policy` |
+| ServiceMonitor | `kvi-controller-manager-metrics-monitor` | `enable_prometheus_servicemonitor` |
 
 CRD files live under `crds/` inside this module and are loaded at plan time
 via `file()`. They must be kept in sync with the operator image version.
 
 ## Prerequisites
 
-- Harvester RKE2 cluster running Kubernetes >= 1.28.
+- Harvester RKE2 cluster running Kubernetes >= 1.28. This is the workload
+  cluster that hosts the kvi-operator and OpenBao StatefulSets — not the
+  dc-api management cluster.
 - Pod Security Admission: the `keyvault-system` namespace is compatible with
   `enforce=restricted` (controller runs as non-root, drops ALL capabilities,
   read-only root filesystem, `seccompProfile: RuntimeDefault`). No label is
@@ -38,6 +92,11 @@ via `file()`. They must be kept in sync with the operator image version.
 - Longhorn (or another CSI) available on the cluster. The controller creates
   per-tenant `KeyVaultBackend` StatefulSets with PVCs; the storage class is
   specified on the `KeyVaultBackend` CR spec, not by this module.
+- For `enable_prometheus_servicemonitor = true`: Prometheus Operator CRDs
+  (`monitoring.coreos.com/v1`) must be installed (e.g. via kube-prometheus-stack).
+- For `enable_cert_manager_metrics = true`: cert-manager must be installed
+  and must have issued a `Certificate` named `metrics-certs` in the
+  keyvault namespace, producing a Secret named `metrics-server-cert`.
 
 ## Usage
 
@@ -61,6 +120,11 @@ module "ms_operators" {
   kv_image_tag = "v0.1.0"
   ghcr_username = var.ghcr_username
   ghcr_pat      = var.ghcr_pat
+
+  # Optional — off by default; enable only when the cluster has these operators
+  # enable_metrics_network_policy    = true
+  # enable_prometheus_servicemonitor = true
+  # enable_cert_manager_metrics      = true
 }
 ```
 
@@ -73,6 +137,9 @@ module "ms_operators" {
 | `kv_image_tag` | `string` | `"v0.0.1"` | Pinned image tag |
 | `ghcr_username` | `string` | `""` | GHCR username; leave empty to skip pull secret |
 | `ghcr_pat` | `string` (sensitive) | `""` | GHCR PAT; leave empty to skip pull secret |
+| `enable_metrics_network_policy` | `bool` | `false` | Create NetworkPolicy gating /metrics ingress to `metrics: enabled` namespaces |
+| `enable_prometheus_servicemonitor` | `bool` | `false` | Create ServiceMonitor (requires Prometheus Operator CRDs) |
+| `enable_cert_manager_metrics` | `bool` | `false` | Mount cert-manager TLS certs into the metrics endpoint (requires cert-manager + a Certificate CR named `metrics-certs`) |
 
 ## Outputs
 
@@ -95,13 +162,17 @@ after removing the lifecycle block temporarily.
 This module sits downstream of `harvester-integration` (which registers the
 cluster with Rancher) and `dc-controlplane` (which creates the RKE2 cluster).
 The consumer layer wires the kubernetes provider from the cluster's kubeconfig
-output, exactly as `dc-controlplane-services` does today. Consumer-layer
-wiring is in `wso2-datacenter-project` (TBD).
+output, exactly as `dc-controlplane-services` does today.
 
-## Deviations from source YAML
+## Deviations from kustomize build output
 
-| YAML | This module | Reason |
+| kustomize | This module | Reason |
 |---|---|---|
 | `managed-by: kustomize` | `managed-by: terraform` | Reflects actual deployment tool |
-| `imagePullSecrets` always present | Conditional on `ghcr_username`+`ghcr_pat` | Allows public-image or cluster-level-credential deployments without a dummy secret |
-| Image `ghcr.io/wso2/keyvault-operator:v0.9.0` | `var.kv_image:var.kv_image_tag` | Caller-controlled; not pinned to the Flux automation placeholder tag |
+| `imagePullSecrets` always absent | Conditional on `ghcr_username`+`ghcr_pat` | Allows pull-secret injection without altering the canonical YAML |
+| Image `ghcr.io/hiranadikari/keyvault-operator:v0.0.1` | `var.kv_image:var.kv_image_tag` | Caller-controlled; not pinned in module |
+| `kvi-manager-role` rules: no `namespaces` resource | `namespaces` added | KVI controller creates per-tenant namespaces; this is an intentional addition to the kubebuilder scaffold |
+| `memory: 128Mi` limit (canonical) | `128Mi` | Aligned with canonical; prior module had 256Mi |
+| NetworkPolicy: commented out in kustomize | Optional via `enable_metrics_network_policy` | Preserves kustomize default (off) while making it available |
+| ServiceMonitor: commented out in kustomize | Optional via `enable_prometheus_servicemonitor` | Avoids hard dependency on Prometheus Operator |
+| cert-manager patches: commented out in kustomize | Optional via `enable_cert_manager_metrics` | Avoids hard dependency on cert-manager |

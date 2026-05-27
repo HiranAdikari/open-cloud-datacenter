@@ -43,3 +43,23 @@ variable "ghcr_pat" {
   description = "GitHub Personal Access Token with read:packages scope. Required when ghcr_username is set. Stored as a kubernetes.io/dockerconfigjson Secret in the operator namespace."
   default     = ""
 }
+
+# ── Optional feature toggles ──────────────────────────────────────────────────
+
+variable "enable_metrics_network_policy" {
+  type        = bool
+  description = "When true, creates a NetworkPolicy restricting /metrics (port 8443) ingress to namespaces labelled 'metrics: enabled'. Mirrors config/network-policy/allow-metrics-traffic.yaml. Off by default to match the kustomize/default baseline where the network-policy resource is commented out. Enable when the cluster has NetworkPolicy enforcement (Calico/Cilium)."
+  default     = false
+}
+
+variable "enable_prometheus_servicemonitor" {
+  type        = bool
+  description = "When true, creates a ServiceMonitor (monitoring.coreos.com/v1) that points Prometheus at the controller-manager metrics Service. Requires the Prometheus Operator CRDs to be installed on the target cluster (e.g. via kube-prometheus-stack). Off by default to avoid a hard dependency on the Prometheus Operator."
+  default     = false
+}
+
+variable "enable_cert_manager_metrics" {
+  type        = bool
+  description = "When true, mounts the cert-manager-issued 'metrics-server-cert' Secret into the manager container and adds --metrics-cert-path, enabling TLS on the /metrics endpoint. Also updates the ServiceMonitor tlsConfig when enable_prometheus_servicemonitor is true. Requires cert-manager to be installed and to have issued a Certificate named 'metrics-certs' in the keyvault namespace."
+  default     = false
+}

@@ -9,15 +9,26 @@
 # All provider config (kubernetes host + credentials) lives in the calling
 # environment layer. This module only contains resource definitions.
 #
-# Source manifests: flux/platform/keyvault-operator/base/ in this repo.
-# Labels: app.kubernetes.io/managed-by changed from "kustomize" to "terraform"
-# to reflect the deployment tool accurately. All other labels are verbatim.
+# Source: crds/keyvault/config/ in the sovereign-cloud repo
+#   (github.com/HiranAdikari/sovereign-cloud). The canonical deployment
+#   command is `kustomize build crds/keyvault/config/default | kubectl apply`.
+#   This module re-expresses that output as typed Terraform resources so the
+#   same cluster state is managed idiomatically without requiring kustomize at
+#   apply time.
+#
+# How to refresh from upstream:
+#   1. Run: kubectl kustomize crds/keyvault/config/default
+#   2. Diff each resource kind+name against the corresponding TF resource below.
+#   3. Reconcile any structural changes (new rules, new args, changed limits).
+#   4. Bump CRD files in crds/ alongside the operator image tag bump.
 # ─────────────────────────────────────────────────────────────────────────────
 
 locals {
   # Emitted on every resource so the label set is consistent.
+  # Canonical kustomize labels are app.kubernetes.io/name=keyvault +
+  # app.kubernetes.io/managed-by=kustomize; we swap managed-by to terraform.
   kv_labels = {
-    "app.kubernetes.io/name"       = "keyvault-operator"
+    "app.kubernetes.io/name"       = "keyvault"
     "app.kubernetes.io/managed-by" = "terraform"
   }
 
@@ -30,8 +41,10 @@ locals {
 
 resource "kubernetes_namespace" "keyvault_system" {
   metadata {
-    name   = var.kv_namespace
-    labels = local.kv_labels
+    name = var.kv_namespace
+    labels = merge(local.kv_labels, {
+      "control-plane" = "controller-manager"
+    })
   }
   lifecycle {
     # Rancher and other cluster-level controllers add annotations that TF
@@ -94,10 +107,11 @@ resource "kubernetes_manifest" "crd_keyvaultinstances" {
 }
 
 # ── Keyvault-operator: ServiceAccount ────────────────────────────────────────
+# kustomize namePrefix "kvi-" yields name "kvi-controller-manager".
 
 resource "kubernetes_service_account" "keyvault_controller_manager" {
   metadata {
-    name      = "keyvault-controller-manager"
+    name      = "kvi-controller-manager"
     namespace = kubernetes_namespace.keyvault_system.metadata[0].name
     labels    = local.kv_labels
   }
@@ -109,7 +123,7 @@ resource "kubernetes_service_account" "keyvault_controller_manager" {
 
 resource "kubernetes_role_v1" "kv_leader_election" {
   metadata {
-    name      = "keyvault-leader-election-role"
+    name      = "kvi-leader-election-role"
     namespace = kubernetes_namespace.keyvault_system.metadata[0].name
     labels    = local.kv_labels
   }
@@ -133,8 +147,9 @@ resource "kubernetes_role_v1" "kv_leader_election" {
 
 resource "kubernetes_role_binding_v1" "kv_leader_election" {
   metadata {
-    name      = "keyvault-leader-election-rolebinding"
+    name      = "kvi-leader-election-rolebinding"
     namespace = kubernetes_namespace.keyvault_system.metadata[0].name
+    labels    = local.kv_labels
   }
   role_ref {
     api_group = "rbac.authorization.k8s.io"
@@ -151,22 +166,24 @@ resource "kubernetes_role_binding_v1" "kv_leader_election" {
 # ── Keyvault-operator: manager ClusterRole + ClusterRoleBinding ───────────────
 # Cluster-scoped so the controller can manage CRs and per-tenant namespaced
 # objects (StatefulSets, Secrets, RBAC) across all tenant namespaces.
+# namespaces is included here (not in canonical role.yaml) because the KVI
+# controller creates per-tenant namespaces — this is an intentional addition
+# to the kubebuilder scaffold.
 
 resource "kubernetes_cluster_role_v1" "kv_manager" {
   metadata {
-    name   = "keyvault-manager-role"
-    labels = local.kv_labels
+    name = "kvi-manager-role"
   }
 
   rule {
     api_groups = [""]
-    resources  = ["namespaces", "configmaps", "services", "serviceaccounts"]
+    resources  = ["configmaps", "namespaces", "serviceaccounts", "services"]
     verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
   }
   rule {
     api_groups = [""]
-    resources  = ["secrets"]
-    verbs      = ["get", "list", "watch", "create"]
+    resources  = ["persistentvolumeclaims"]
+    verbs      = ["get", "list", "watch", "delete"]
   }
   rule {
     api_groups = [""]
@@ -182,24 +199,12 @@ resource "kubernetes_cluster_role_v1" "kv_manager" {
   }
   rule {
     api_groups = [""]
-    resources  = ["persistentvolumeclaims"]
-    verbs      = ["get", "list", "watch", "delete"]
-  }
-  rule {
-    api_groups = [""]
-    resources  = ["events"]
-    verbs      = ["create", "patch"]
+    resources  = ["secrets"]
+    verbs      = ["get", "list", "watch", "create"]
   }
   rule {
     api_groups = ["apps"]
     resources  = ["statefulsets"]
-    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
-  }
-  # The controller creates per-tenant Roles + RoleBindings inside tenant
-  # namespaces to bind the AppRole credentials Secret to a limited SA.
-  rule {
-    api_groups = ["rbac.authorization.k8s.io"]
-    resources  = ["roles", "rolebindings"]
     verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
   }
   rule {
@@ -217,11 +222,19 @@ resource "kubernetes_cluster_role_v1" "kv_manager" {
     resources  = ["keyvaultbackends/status", "keyvaultinstances/status"]
     verbs      = ["get", "update", "patch"]
   }
+  # The controller creates per-tenant Roles + RoleBindings inside tenant
+  # namespaces to bind the AppRole credentials Secret to a limited SA.
+  rule {
+    api_groups = ["rbac.authorization.k8s.io"]
+    resources  = ["roles", "rolebindings"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
+  }
 }
 
 resource "kubernetes_cluster_role_binding_v1" "kv_manager" {
   metadata {
-    name = "keyvault-manager-rolebinding"
+    name   = "kvi-manager-rolebinding"
+    labels = local.kv_labels
   }
   role_ref {
     api_group = "rbac.authorization.k8s.io"
@@ -241,7 +254,7 @@ resource "kubernetes_cluster_role_binding_v1" "kv_manager" {
 
 resource "kubernetes_cluster_role_v1" "kv_metrics_auth" {
   metadata {
-    name = "keyvault-metrics-auth-role"
+    name = "kvi-metrics-auth-role"
   }
   rule {
     api_groups = ["authentication.k8s.io"]
@@ -257,7 +270,7 @@ resource "kubernetes_cluster_role_v1" "kv_metrics_auth" {
 
 resource "kubernetes_cluster_role_binding_v1" "kv_metrics_auth" {
   metadata {
-    name = "keyvault-metrics-auth-rolebinding"
+    name = "kvi-metrics-auth-rolebinding"
   }
   role_ref {
     api_group = "rbac.authorization.k8s.io"
@@ -277,7 +290,7 @@ resource "kubernetes_cluster_role_binding_v1" "kv_metrics_auth" {
 
 resource "kubernetes_cluster_role_v1" "kv_metrics_reader" {
   metadata {
-    name = "keyvault-metrics-reader"
+    name = "kvi-metrics-reader"
   }
   rule {
     non_resource_urls = ["/metrics"]
@@ -285,13 +298,189 @@ resource "kubernetes_cluster_role_v1" "kv_metrics_reader" {
   }
 }
 
+# ── Keyvault-operator: helper ClusterRoles (admin / editor / viewer) ──────────
+# Kubebuilder scaffolds these for cluster admins to delegate object-level
+# access to KeyVaultBackend and KeyVaultInstance CRs. The operator itself does
+# not use them — they are scaffolding aids for human operators.
+
+resource "kubernetes_cluster_role_v1" "kv_keyvaultbackend_admin" {
+  metadata {
+    name   = "kvi-keyvaultbackend-admin-role"
+    labels = local.kv_labels
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultbackends"]
+    verbs      = ["*"]
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultbackends/status"]
+    verbs      = ["get"]
+  }
+}
+
+resource "kubernetes_cluster_role_v1" "kv_keyvaultbackend_editor" {
+  metadata {
+    name   = "kvi-keyvaultbackend-editor-role"
+    labels = local.kv_labels
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultbackends"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultbackends/status"]
+    verbs      = ["get"]
+  }
+}
+
+resource "kubernetes_cluster_role_v1" "kv_keyvaultbackend_viewer" {
+  metadata {
+    name   = "kvi-keyvaultbackend-viewer-role"
+    labels = local.kv_labels
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultbackends"]
+    verbs      = ["get", "list", "watch"]
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultbackends/status"]
+    verbs      = ["get"]
+  }
+}
+
+resource "kubernetes_cluster_role_v1" "kv_keyvaultinstance_admin" {
+  metadata {
+    name   = "kvi-keyvaultinstance-admin-role"
+    labels = local.kv_labels
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultinstances"]
+    verbs      = ["*"]
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultinstances/status"]
+    verbs      = ["get"]
+  }
+}
+
+resource "kubernetes_cluster_role_v1" "kv_keyvaultinstance_editor" {
+  metadata {
+    name   = "kvi-keyvaultinstance-editor-role"
+    labels = local.kv_labels
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultinstances"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultinstances/status"]
+    verbs      = ["get"]
+  }
+}
+
+resource "kubernetes_cluster_role_v1" "kv_keyvaultinstance_viewer" {
+  metadata {
+    name   = "kvi-keyvaultinstance-viewer-role"
+    labels = local.kv_labels
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultinstances"]
+    verbs      = ["get", "list", "watch"]
+  }
+  rule {
+    api_groups = ["keyvault.opencloud.wso2.com"]
+    resources  = ["keyvaultinstances/status"]
+    verbs      = ["get"]
+  }
+}
+
+# ── Keyvault-operator: Metrics Service ───────────────────────────────────────
+# Exposes port 8443 (the controller's metrics HTTPS port). The controller's
+# health probes run on 8081; this Service is for Prometheus scraping only.
+# Port 8443 is wired by the manager_metrics_patch applied in kustomize/default.
+
+resource "kubernetes_service" "kv_metrics" {
+  metadata {
+    name      = "kvi-controller-manager-metrics-service"
+    namespace = kubernetes_namespace.keyvault_system.metadata[0].name
+    labels = merge(local.kv_labels, {
+      "control-plane" = "controller-manager"
+    })
+  }
+  spec {
+    selector = {
+      "control-plane"          = "controller-manager"
+      "app.kubernetes.io/name" = "keyvault"
+    }
+    port {
+      name        = "https"
+      port        = 8443
+      protocol    = "TCP"
+      target_port = 8443
+    }
+  }
+}
+
+# ── Keyvault-operator: NetworkPolicy (optional) ───────────────────────────────
+# Gates ingress to the metrics endpoint (8443) from namespaces labelled
+# `metrics: enabled`. Mirrored from config/network-policy/allow-metrics-traffic.yaml.
+# Off by default — matches kustomize/default where the network-policy resource
+# is commented out. Enable when the cluster has NetworkPolicy enforcement and
+# you want to restrict who can scrape /metrics.
+
+resource "kubernetes_network_policy_v1" "kv_allow_metrics" {
+  count = var.enable_metrics_network_policy ? 1 : 0
+
+  metadata {
+    name      = "kvi-allow-metrics-traffic"
+    namespace = kubernetes_namespace.keyvault_system.metadata[0].name
+    labels    = local.kv_labels
+  }
+
+  spec {
+    pod_selector {
+      match_labels = {
+        "control-plane"          = "controller-manager"
+        "app.kubernetes.io/name" = "keyvault"
+      }
+    }
+    policy_types = ["Ingress"]
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = {
+            "metrics" = "enabled"
+          }
+        }
+      }
+      ports {
+        port     = "8443"
+        protocol = "TCP"
+      }
+    }
+  }
+}
+
 # ── Keyvault-operator: Deployment ────────────────────────────────────────────
 
 resource "kubernetes_deployment" "keyvault_controller_manager" {
   metadata {
-    name      = "keyvault-controller-manager"
+    name      = "kvi-controller-manager"
     namespace = kubernetes_namespace.keyvault_system.metadata[0].name
-    labels    = local.kv_labels
+    labels = merge(local.kv_labels, {
+      "control-plane" = "controller-manager"
+    })
   }
 
   # Same CI-ownership pattern as dc-controlplane-services: TF seeds the
@@ -312,16 +501,15 @@ resource "kubernetes_deployment" "keyvault_controller_manager" {
     selector {
       match_labels = {
         "control-plane"          = "controller-manager"
-        "app.kubernetes.io/name" = "keyvault-operator"
+        "app.kubernetes.io/name" = "keyvault"
       }
     }
 
     template {
       metadata {
         labels = {
-          "control-plane"                = "controller-manager"
-          "app.kubernetes.io/name"       = "keyvault-operator"
-          "app.kubernetes.io/managed-by" = "terraform"
+          "control-plane"          = "controller-manager"
+          "app.kubernetes.io/name" = "keyvault"
         }
         annotations = {
           # Marks the primary container for `kubectl logs` / `kubectl exec`
@@ -353,10 +541,19 @@ resource "kubernetes_deployment" "keyvault_controller_manager" {
           image             = "${var.kv_image}:${var.kv_image_tag}"
           image_pull_policy = "IfNotPresent"
           command           = ["/manager"]
-          args = [
-            "--leader-elect",
-            "--health-probe-bind-address=:8081",
-          ]
+
+          # --metrics-bind-address is added by the manager_metrics_patch in
+          # kustomize/default. It binds the HTTPS metrics server on :8443.
+          # --metrics-cert-path is only added when enable_cert_manager_metrics
+          # is true (cert_metrics_manager_patch effect).
+          args = concat(
+            [
+              "--metrics-bind-address=:8443",
+              "--leader-elect",
+              "--health-probe-bind-address=:8081",
+            ],
+            var.enable_cert_manager_metrics ? ["--metrics-cert-path=/tmp/k8s-metrics-server/metrics-certs"] : [],
+          )
 
           security_context {
             read_only_root_filesystem  = true
@@ -397,7 +594,42 @@ resource "kubernetes_deployment" "keyvault_controller_manager" {
             }
             limits = {
               cpu    = "500m"
-              memory = "256Mi"
+              memory = "128Mi"
+            }
+          }
+
+          # cert_metrics_manager_patch mounts the cert-manager-issued Secret
+          # at /tmp/k8s-metrics-server/metrics-certs. Only present when TLS
+          # cert rotation is enabled for the metrics endpoint.
+          dynamic "volume_mount" {
+            for_each = var.enable_cert_manager_metrics ? [1] : []
+            content {
+              name       = "metrics-certs"
+              mount_path = "/tmp/k8s-metrics-server/metrics-certs"
+              read_only  = true
+            }
+          }
+        }
+
+        dynamic "volume" {
+          for_each = var.enable_cert_manager_metrics ? [1] : []
+          content {
+            name = "metrics-certs"
+            secret {
+              secret_name = "metrics-server-cert"
+              optional    = false
+              items {
+                key  = "ca.crt"
+                path = "ca.crt"
+              }
+              items {
+                key  = "tls.crt"
+                path = "tls.crt"
+              }
+              items {
+                key  = "tls.key"
+                path = "tls.key"
+              }
             }
           }
         }
@@ -412,29 +644,72 @@ resource "kubernetes_deployment" "keyvault_controller_manager" {
   ]
 }
 
-# ── Keyvault-operator: Metrics Service ───────────────────────────────────────
-# Exposes port 8443 (the controller's metrics/webhook HTTPS port). The
-# controller's health probes run on 8081; this service is for Prometheus
-# scraping only. Both ports are standard kubebuilder scaffolding — 8443 is
-# the RBAC-proxy side-car port in kubebuilder v2/v3; later kubebuilder
-# versions embed the metrics server directly on 8443.
+# ── Keyvault-operator: ServiceMonitor (optional) ──────────────────────────────
+# Requires the Prometheus Operator CRDs (monitoring.coreos.com/v1) to be
+# installed on the target cluster. Off by default — enable only when the
+# cluster runs kube-prometheus-stack or another Prometheus Operator deployment.
+# Mirrored from config/prometheus/monitor.yaml.
+#
+# When enable_cert_manager_metrics is also true, the tlsConfig is updated to
+# use the cert-manager-issued metrics-server-cert Secret instead of
+# insecureSkipVerify. This mirrors the effect of monitor_tls_patch.yaml.
 
-resource "kubernetes_service" "kv_metrics" {
-  metadata {
-    name      = "keyvault-operator-metrics"
-    namespace = kubernetes_namespace.keyvault_system.metadata[0].name
-    labels    = local.kv_labels
-  }
-  spec {
-    selector = {
-      "control-plane"          = "controller-manager"
-      "app.kubernetes.io/name" = "keyvault-operator"
+resource "kubernetes_manifest" "kv_service_monitor" {
+  count = var.enable_prometheus_servicemonitor ? 1 : 0
+
+  manifest = {
+    apiVersion = "monitoring.coreos.com/v1"
+    kind       = "ServiceMonitor"
+    metadata = {
+      name      = "kvi-controller-manager-metrics-monitor"
+      namespace = kubernetes_namespace.keyvault_system.metadata[0].name
+      labels = merge(local.kv_labels, {
+        "control-plane" = "controller-manager"
+      })
     }
-    port {
-      name        = "https"
-      port        = 8443
-      protocol    = "TCP"
-      target_port = 8443
+    spec = {
+      selector = {
+        matchLabels = {
+          "control-plane"          = "controller-manager"
+          "app.kubernetes.io/name" = "keyvault"
+        }
+      }
+      endpoints = [
+        var.enable_cert_manager_metrics ? {
+          path            = "/metrics"
+          port            = "https"
+          scheme          = "https"
+          bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+          tlsConfig = {
+            serverName         = "kvi-controller-manager-metrics-service.${kubernetes_namespace.keyvault_system.metadata[0].name}.svc"
+            insecureSkipVerify = false
+            ca = {
+              secret = {
+                name = "metrics-server-cert"
+                key  = "ca.crt"
+              }
+            }
+            cert = {
+              secret = {
+                name = "metrics-server-cert"
+                key  = "tls.crt"
+              }
+            }
+            keySecret = {
+              name = "metrics-server-cert"
+              key  = "tls.key"
+            }
+          }
+          } : {
+          path            = "/metrics"
+          port            = "https"
+          scheme          = "https"
+          bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+          tlsConfig = {
+            insecureSkipVerify = true
+          }
+        }
+      ]
     }
   }
 }
