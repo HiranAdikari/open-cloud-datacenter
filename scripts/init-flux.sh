@@ -784,9 +784,58 @@ cmd_seal() {
   git_commit_push "environments/$env_name/flux" \
     "Seal $env_name secrets"
 
+  trigger_initial_image_builds
+
   echo
   echo "  Watch the platform Kustomization come up:"
   echo "    kubectl get kustomization,pods -A -w"
+}
+
+# trigger_initial_image_builds — kick off the GitHub Actions builds for
+# every image whose tag the ImagePolicy regex can't auto-discover.
+#
+# Today that's keyvault-operator only: its existing ImagePolicy is
+# SHA-only, but past hand-built tags were SemVer + arch-mismatched. The
+# wizard's overlay still ships a placeholder kvi_operator_initial_tag
+# default that may not exist (or may exist with the wrong architecture)
+# in the consumer's GHCR org. Until image-automation has seen its first
+# SHA-tagged push, the kvi pod ImagePullBackOff's.
+#
+# Triggering the workflow once after seal gives image-automation a tag
+# to bump to. Once ARC's dc-runner picks up the job (already up if
+# seal succeeded), it builds + pushes ghcr.io/<org>/keyvault-operator:<sha>,
+# image-automation rewrites the overlay's newTag on its next 5m poll,
+# Flux applies, kvi pod pulls cleanly.
+#
+# dc-api and cloud-ui don't need this — their existing images in GHCR
+# work, and image-automation handles ongoing bumps.
+#
+# Skip silently if gh CLI isn't installed, the source repo isn't
+# reachable, or the workflow doesn't exist.
+trigger_initial_image_builds() {
+  echo
+  echo "── trigger initial image builds ──"
+
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "  ! gh CLI not on PATH — skipping. Trigger manually:"
+    echo "    gh workflow run keyvault-operator.yaml --repo HiranAdikari/sovereign-cloud --ref main"
+    return 0
+  fi
+
+  # Source repo + workflow are spike-phase fixed. After spike merges and
+  # CI lives in OCD, these become operator-configurable inputs.
+  local src_repo="HiranAdikari/sovereign-cloud"
+  local wf="keyvault-operator.yaml"
+
+  echo "  - triggering $wf on $src_repo (ref: main)"
+  if gh workflow run "$wf" --repo "$src_repo" --ref main >/dev/null 2>&1; then
+    echo "  ✓ workflow_dispatch sent — dc-runner will pick it up shortly"
+    echo "    watch: gh run watch --repo $src_repo"
+  else
+    echo "  ! gh workflow run failed (auth? no access to $src_repo?)"
+    echo "    trigger by hand later:"
+    echo "      gh workflow run $wf --repo $src_repo --ref main"
+  fi
 }
 
 # ── dispatch ─────────────────────────────────────────────────────────────────
