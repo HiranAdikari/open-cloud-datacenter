@@ -5,6 +5,7 @@ resources:
   - dc-postgres/base
   - cloud-ui/base
   - keyvault-operator/base
+  - arc/base
 # dc-webhook is NOT here. It runs on the Harvester host cluster (intercepts
 # kubevirt.io VirtualMachine admission, which only lives on Harvester) and
 # is installed by the TF `02-dc-operators` layer via the OCD
