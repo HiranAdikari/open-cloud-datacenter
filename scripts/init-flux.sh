@@ -493,7 +493,8 @@ cmd_init() {
   ask runner_github_repo  "GitHub repo name of the SOURCE repo"                   "sovereign-cloud" "$SLUG_RE"
   auto_or_ask dc_api_tag          "Initial dc-api image tag"  "flux-bootstrap"   "dc_api_initial_tag"           "latest"
   auto_or_ask cloud_ui_tag        "Initial cloud-ui image tag" "flux-bootstrap"  "cloud_ui_initial_tag"         "latest"
-  auto_or_ask kvi_tag             "Initial keyvault-operator image tag" "flux-bootstrap" "keyvault_operator_initial_tag" "v0.0.2"
+  # keyvault-operator image tag is set by the TF module that deploys
+  # KVI to the Harvester cluster (not Flux-managed on this cluster).
 
   # Tag-vs-branch heuristic for sources.yaml.
   if [[ "$ocd_ref" =~ ^v[0-9]+\.[0-9]+ ]]; then
@@ -520,7 +521,6 @@ cmd_init() {
       -e "s|CHANGE-ME-env|$env_name|g" \
       -e "s|CHANGE-ME-dc-api-tag|$dc_api_tag|g" \
       -e "s|CHANGE-ME-cloud-ui-tag|$cloud_ui_tag|g" \
-      -e "s|CHANGE-ME-kvi-operator-tag|$kvi_tag|g" \
       -e "s|ref=v0\\.9\\.0|ref=$ocd_ref|g" \
       -e "s|github.com/wso2/open-cloud-datacenter|github.com/$ocd_owner/$ocd_repo|g" \
       -e "s|    tag: v0\\.9\\.0|    $ocd_ref_field: $ocd_ref|g" \
@@ -645,7 +645,7 @@ cmd_seal() {
   echo "  ℹ  GHCR pull-token: classic GitHub PAT for pulling the consumer's"
   echo "     images from ghcr.io. Generate at:"
   echo "       https://github.com/settings/tokens (classic)  →  scope: read:packages"
-  echo "     Used by dc-system, flux-system, keyvault-system to pull images."
+  echo "     Used by dc-system + flux-system to pull images."
   ask_secret ghcr_pat                  "GHCR personal-access token (read:packages)"
 
   echo
@@ -726,9 +726,10 @@ cmd_seal() {
        --from-literal=DCAPI_BFF_SESSION_SECRET="$bff_session_secret" \
        --from-file=DCAPI_HARVESTER_KUBECONFIG="$harvester_kubeconfig_path"
 
-  seal_dockerconfig sealed-ghcr-pull-secret.yaml                 ghcr-pull-secret dc-system       "$ghcr_org" "$ghcr_pat"
-  seal_dockerconfig sealed-ghcr-pull-secret-flux-system.yaml     ghcr-pull-secret flux-system     "$ghcr_org" "$ghcr_pat"
-  seal_dockerconfig sealed-ghcr-pull-secret-keyvault-system.yaml ghcr-pull-secret keyvault-system "$ghcr_org" "$ghcr_pat"
+  seal_dockerconfig sealed-ghcr-pull-secret.yaml             ghcr-pull-secret dc-system   "$ghcr_org" "$ghcr_pat"
+  seal_dockerconfig sealed-ghcr-pull-secret-flux-system.yaml ghcr-pull-secret flux-system "$ghcr_org" "$ghcr_pat"
+  # keyvault-system pull secret removed — KVI runs on Harvester
+  # (TF-deployed), not on dcapi-controlplane.
 
   # GitHub runner PAT — read by the ARC runner scale-set HelmRelease in
   # arc-runners. The key name `github_token` matches what the
@@ -777,7 +778,6 @@ cmd_seal() {
       print "  - ./sealed-dc-api-tls.yaml"
       print "  - ./sealed-ghcr-pull-secret.yaml"
       print "  - ./sealed-ghcr-pull-secret-flux-system.yaml"
-      print "  - ./sealed-ghcr-pull-secret-keyvault-system.yaml"
       print "  - ./sealed-github-runner-pat.yaml"
       skip = 1
       next
@@ -797,76 +797,17 @@ cmd_seal() {
   git_commit_push "environments/$env_name/flux" \
     "Seal $env_name secrets"
 
-  trigger_initial_image_builds
-
   echo
   echo "  Watch the platform Kustomization come up:"
   echo "    kubectl get kustomization,pods -A -w"
 }
 
-# trigger_initial_image_builds — kick off the GitHub Actions builds for
-# every image whose tag the ImagePolicy regex can't auto-discover.
-#
-# Today that's keyvault-operator only: its existing ImagePolicy is
-# SHA-only, but past hand-built tags were SemVer + arch-mismatched. The
-# wizard's overlay still ships a placeholder kvi_operator_initial_tag
-# default that may not exist (or may exist with the wrong architecture)
-# in the consumer's GHCR org. Until image-automation has seen its first
-# SHA-tagged push, the kvi pod ImagePullBackOff's.
-#
-# Triggering the workflow once after seal gives image-automation a tag
-# to bump to. Once ARC's dc-runner picks up the job (already up if
-# seal succeeded), it builds + pushes ghcr.io/<org>/keyvault-operator:<sha>,
-# image-automation rewrites the overlay's newTag on its next 5m poll,
-# Flux applies, kvi pod pulls cleanly.
-#
-# dc-api and cloud-ui don't need this — their existing images in GHCR
-# work, and image-automation handles ongoing bumps.
-#
-# Skip silently if gh CLI isn't installed, the source repo isn't
-# reachable, or the workflow doesn't exist.
-trigger_initial_image_builds() {
-  echo
-  echo "── trigger initial image builds ──"
-
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "  ! gh CLI not on PATH — skipping. Trigger manually:"
-    echo "    gh workflow run keyvault-operator.yaml --repo HiranAdikari/sovereign-cloud --ref main"
-    return 0
-  fi
-
-  # Source repo + workflow are spike-phase fixed. After spike merges and
-  # CI lives in OCD, these become operator-configurable inputs.
-  local src_repo="HiranAdikari/sovereign-cloud"
-  local wf="keyvault-operator.yaml"
-
-  # Cancel any orphan queued runs first. ARC has a known quirk where
-  # jobs queued against a previous (now-dead) listener session never get
-  # re-assigned to a new listener — they sit forever in "waiting for
-  # runner". Wipe them so our fresh dispatch goes to the live listener.
-  local orphans
-  orphans=$(gh run list --repo "$src_repo" --workflow="$wf" --status=queued \
-    --json databaseId --jq '.[].databaseId' 2>/dev/null || true)
-  if [[ -n "$orphans" ]]; then
-    local n
-    n=$(echo "$orphans" | wc -l | tr -d ' ')
-    echo "  - cancelling $n orphan queued run(s) before fresh dispatch"
-    while IFS= read -r run_id; do
-      [[ -z "$run_id" ]] && continue
-      gh run cancel "$run_id" --repo "$src_repo" >/dev/null 2>&1 || true
-    done <<<"$orphans"
-  fi
-
-  echo "  - triggering $wf on $src_repo (ref: main)"
-  if gh workflow run "$wf" --repo "$src_repo" --ref main >/dev/null 2>&1; then
-    echo "  ✓ workflow_dispatch sent — dc-runner will pick it up shortly"
-    echo "    watch: gh run watch --repo $src_repo"
-  else
-    echo "  ! gh workflow run failed (auth? no access to $src_repo?)"
-    echo "    trigger by hand later:"
-    echo "      gh workflow run $wf --repo $src_repo --ref main"
-  fi
-}
+# trigger_initial_image_builds was removed when KVI moved to TF on
+# Harvester. dc-api + cloud-ui images already exist in GHCR and
+# image-automation handles ongoing bumps; no first-time build needed
+# from the wizard. If a future image goes back to needing a one-shot
+# kick (e.g. a new Flux-managed app whose image-automation regex
+# doesn't match published tags yet), this is the place to re-add it.
 
 # ── dispatch ─────────────────────────────────────────────────────────────────
 case "$subcommand" in
