@@ -449,6 +449,7 @@ cmd_init() {
            "$target_dir/platform.yaml" \
            "$target_dir/image-update-automation.yaml" \
            "$target_dir/README.md" \
+           "$target_dir/kustomization.yaml" \
            "$overlay_dir/kustomization.yaml"
   fi
 
@@ -520,6 +521,13 @@ cmd_init() {
   subst "$template_dir/infrastructure.yaml"   "$target_dir/infrastructure.yaml"
   subst "$template_dir/platform.yaml"         "$target_dir/platform.yaml"
   subst "$template_dir/platform-overlay/kustomization.yaml" "$overlay_dir/kustomization.yaml"
+
+  # Root kustomization.yaml — without this, Flux's root reconcile
+  # falls into a fallback mode that recurses into platform-overlay/
+  # and tries to apply Ingresses before ingress-nginx is up.
+  # No template substitution needed; it's a static file.
+  cp "$template_dir/kustomization.yaml" "$target_dir/kustomization.yaml"
+  echo "  wrote $target_dir/kustomization.yaml"
 
   sed \
     -e "s|CHANGE-ME-env|$env_name|g" \
