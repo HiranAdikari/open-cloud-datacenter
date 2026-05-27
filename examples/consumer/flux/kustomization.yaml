@@ -19,6 +19,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  # flux-system/ MUST be listed — it contains gotk-components.yaml,
+  # gotk-sync.yaml, and the bootstrap kustomization.yaml that
+  # flux_bootstrap_git wrote. Without it in the root inventory, the
+  # root Kustomization (prune: true) deletes everything in the
+  # gotk-* set on the next reconcile — including the GitRepository
+  # the root itself depends on, plus source-controller /
+  # kustomize-controller / notification-controller. The cluster
+  # silently goes offline.
+  - flux-system
   - sources.yaml
   - infrastructure.yaml
   - platform.yaml
