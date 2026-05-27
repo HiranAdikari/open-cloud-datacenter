@@ -32,6 +32,13 @@
 #                           init: regenerates the overlay (preserves
 #                                 flux-system/ + sealed-*.yaml from prior runs)
 #                           seal: regenerates sealed-*.yaml (preserves the rest)
+#   --no-git                Don't auto stage/commit/push the generated files.
+#                           By default both subcommands commit + push for you
+#                           to whatever branch your consumer repo is on, using
+#                           the upstream-safe `git push -u origin HEAD:<branch>`
+#                           form. Pass --no-git if you want to review the diff
+#                           or batch the push with other work.
+#   --remote <name>         Git remote to push to. Default: origin.
 #   -h, --help              Show this help.
 
 set -euo pipefail
@@ -59,12 +66,16 @@ esac
 consumer_dir=""
 env_name=""
 force=false
+no_git=false
+git_remote="origin"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --consumer-dir) consumer_dir="$2"; shift 2 ;;
     --env-name)     env_name="$2"; shift 2 ;;
     --force)        force=true; shift ;;
+    --no-git)       no_git=true; shift ;;
+    --remote)       git_remote="$2"; shift 2 ;;
     -h|--help)
       sed -n '2,/^set -euo/p' "$0" | sed 's/^# \?//;$d'
       exit 0
@@ -281,6 +292,92 @@ auto_or_ask_secret() {
   ask_secret "$var" "$prompt"
 }
 
+# ── git helper ───────────────────────────────────────────────────────────────
+# Stage + commit + push the wizard's output. Called at the end of both init
+# and seal so the operator doesn't have to remember the right invocation
+# (and so we avoid the upstream-branch-name trap that `git push` falls into
+# when push.default = simple sees a non-matching upstream).
+#
+# Pushes to whatever branch the consumer repo is currently on — never
+# hardcoded. Uses `git push -u origin HEAD:refs/heads/<branch>` so:
+#   - the first push from a fresh checkout sets the tracking ref (-u)
+#   - subsequent pushes don't depend on whatever push.default is configured
+#   - it works regardless of whether the upstream branch name matches
+#
+# Opt out with --no-git on the script invocation (the script then prints
+# the exact commands to run by hand).
+git_commit_push() {
+  local path="$1" message="$2"
+
+  echo
+  echo "── git: stage + commit + push ──"
+
+  (
+    cd "$consumer_dir"
+
+    if $no_git; then
+      echo "  --no-git given; do this yourself:"
+      echo "    cd $consumer_dir"
+      echo "    git add $path"
+      echo "    git commit -m \"$message\""
+      echo "    git push -u $git_remote HEAD"
+      return 0
+    fi
+
+    # Must be on a branch (not detached HEAD) for the push to know where
+    # to send things.
+    local branch
+    if ! branch=$(git symbolic-ref --short HEAD 2>/dev/null); then
+      echo "  ✗ HEAD is detached — can't auto-push" >&2
+      echo "    check out a branch and run by hand:" >&2
+      echo "      cd $consumer_dir" >&2
+      echo "      git add $path" >&2
+      echo "      git commit -m \"$message\"" >&2
+      echo "      git push -u $git_remote HEAD:refs/heads/<branch>" >&2
+      return 1
+    fi
+
+    # Verify the remote exists.
+    if ! git remote get-url "$git_remote" >/dev/null 2>&1; then
+      echo "  ✗ git remote '$git_remote' not configured in $consumer_dir" >&2
+      echo "    add it with: git remote add $git_remote <url>" >&2
+      echo "    or re-run with --remote <name> --no-git to do it yourself" >&2
+      return 1
+    fi
+
+    # If nothing changed under $path, skip silently.
+    if [[ -z "$(git status --porcelain -- "$path" 2>/dev/null)" ]]; then
+      echo "  ✓ no changes under $path — nothing to commit"
+      return 0
+    fi
+
+    git add -- "$path"
+
+    # `git add` on an unchanged file is a no-op; only commit if the index
+    # actually differs from HEAD.
+    if git diff --cached --quiet -- "$path"; then
+      echo "  ✓ index matches HEAD — nothing to commit"
+    else
+      git commit -m "$message" >/dev/null
+      echo "  ✓ committed: $message"
+    fi
+
+    # Explicit refspec form. Bypasses push.default surprises (the
+    # 'upstream branch of your current branch does not match the name of
+    # your current branch' error happens when push.default=simple sees a
+    # tracking ref with a different name than local HEAD). HEAD:refs/heads/X
+    # tells git unambiguously: push my current commit to branch X on origin.
+    if git push -u "$git_remote" "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
+      echo "  ✓ pushed to $git_remote/$branch"
+    else
+      echo "  ✗ push to $git_remote/$branch failed" >&2
+      echo "    retry by hand:" >&2
+      echo "      cd $consumer_dir && git push -u $git_remote HEAD:refs/heads/$branch" >&2
+      return 1
+    fi
+  )
+}
+
 # ── subcommand: init ─────────────────────────────────────────────────────────
 cmd_init() {
   if [[ -e "$overlay_dir/kustomization.yaml" ]]; then
@@ -402,12 +499,10 @@ README
   echo
   echo "── done (init) ──────────────────────────────────────────────"
   echo "  Wrote: $target_dir/"
-  echo
-  echo "  Next steps:"
-  echo "    cd $consumer_dir"
-  echo "    git add environments/$env_name/flux"
-  echo "    git commit -m 'Add Flux overlay for $env_name'"
-  echo "    git push"
+
+  git_commit_push "environments/$env_name/flux" \
+    "Add Flux overlay for $env_name (init phase)"
+
   echo
   echo "  Then:"
   echo "    1. ./tf.sh apply --region $env_name --layer flux-bootstrap"
@@ -577,14 +672,12 @@ cmd_seal() {
   echo
   echo "── done (seal) ──────────────────────────────────────────────"
   echo "  Wrote: $overlay_dir/sealed-*.yaml + updated kustomization.yaml"
+
+  git_commit_push "environments/$env_name/flux" \
+    "Seal $env_name secrets"
+
   echo
-  echo "  Next steps:"
-  echo "    cd $consumer_dir"
-  echo "    git add environments/$env_name/flux"
-  echo "    git commit -m 'Seal $env_name secrets'"
-  echo "    git push"
-  echo
-  echo "  Then watch the platform Kustomization come up:"
+  echo "  Watch the platform Kustomization come up:"
   echo "    kubectl get kustomization,pods -A -w"
 }
 
