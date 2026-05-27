@@ -473,11 +473,24 @@ cmd_init() {
   auto_or_ask ocd_ref             "OCD pin (tag or branch)"   "flux-bootstrap"   "ocd_ref"           "spike/flux-gitops"
   auto_or_ask git_branch          "Consumer-repo branch"      "flux-bootstrap"   "git_branch"        "spike/flux-gitops"
 
-  # Used to render the ARC dc-runner HelmRelease's githubConfigUrl patch
-  # — the runner registers as a self-hosted runner on this repo and
-  # serves jobs scoped to it.
-  auto_or_ask runner_github_owner "GitHub owner for ARC runner registration" "flux-bootstrap" "github_owner" "hiranadikari" "$SLUG_RE"
-  auto_or_ask runner_github_repo  "GitHub repo for ARC runner registration"  "flux-bootstrap" "github_repository" "wso2-datacenter-project" "$SLUG_RE"
+  # Used to render the ARC dc-runner HelmRelease's githubConfigUrl
+  # patch. THIS IS THE SOURCE REPO WHERE CI WORKFLOWS LIVE — not the
+  # consumer/Flux state repo. ARC registers runners per-repo; a
+  # workflow in repo-A whose `runs-on: dc-runner` won't match a
+  # runner registered to repo-B. The kvi-operator / dc-api / cloud-ui
+  # workflows all live in HiranAdikari/sovereign-cloud, so the runner
+  # has to register there.
+  #
+  # We default to HiranAdikari/sovereign-cloud as the spike-phase
+  # source repo. When the spike merges to OCD / new consumers stand
+  # up, override these two prompts to point at the appropriate source
+  # repo.
+  echo
+  echo "  ℹ  ARC runner repo: the SOURCE repo where your CI workflows live"
+  echo "     (.github/workflows/*.yaml). NOT the consumer/Flux-state repo."
+  echo "     For the spike: HiranAdikari/sovereign-cloud."
+  ask runner_github_owner "GitHub owner of the SOURCE repo (where workflows live)" "HiranAdikari" "$SLUG_RE"
+  ask runner_github_repo  "GitHub repo name of the SOURCE repo"                   "sovereign-cloud" "$SLUG_RE"
   auto_or_ask dc_api_tag          "Initial dc-api image tag"  "flux-bootstrap"   "dc_api_initial_tag"           "latest"
   auto_or_ask cloud_ui_tag        "Initial cloud-ui image tag" "flux-bootstrap"  "cloud_ui_initial_tag"         "latest"
   auto_or_ask kvi_tag             "Initial keyvault-operator image tag" "flux-bootstrap" "keyvault_operator_initial_tag" "v0.0.2"
