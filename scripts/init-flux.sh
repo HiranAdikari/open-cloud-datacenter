@@ -471,6 +471,12 @@ cmd_init() {
   auto_or_ask ocd_repo            "OCD repo name"             "flux-bootstrap"   "ocd_repo"          "open-cloud-datacenter"
   auto_or_ask ocd_ref             "OCD pin (tag or branch)"   "flux-bootstrap"   "ocd_ref"           "spike/flux-gitops"
   auto_or_ask git_branch          "Consumer-repo branch"      "flux-bootstrap"   "git_branch"        "spike/flux-gitops"
+
+  # Used to render the ARC dc-runner HelmRelease's githubConfigUrl patch
+  # — the runner registers as a self-hosted runner on this repo and
+  # serves jobs scoped to it.
+  auto_or_ask runner_github_owner "GitHub owner for ARC runner registration" "flux-bootstrap" "github_owner" "hiranadikari" "$SLUG_RE"
+  auto_or_ask runner_github_repo  "GitHub repo for ARC runner registration"  "flux-bootstrap" "github_repository" "wso2-datacenter-project" "$SLUG_RE"
   auto_or_ask dc_api_tag          "Initial dc-api image tag"  "flux-bootstrap"   "dc_api_initial_tag"           "latest"
   auto_or_ask cloud_ui_tag        "Initial cloud-ui image tag" "flux-bootstrap"  "cloud_ui_initial_tag"         "latest"
   auto_or_ask kvi_tag             "Initial keyvault-operator image tag" "flux-bootstrap" "keyvault_operator_initial_tag" "v0.0.2"
@@ -504,6 +510,8 @@ cmd_init() {
       -e "s|ref=v0\\.9\\.0|ref=$ocd_ref|g" \
       -e "s|github.com/wso2/open-cloud-datacenter|github.com/$ocd_owner/$ocd_repo|g" \
       -e "s|    tag: v0\\.9\\.0|    $ocd_ref_field: $ocd_ref|g" \
+      -e "s|CHANGE-ME-github-owner|$runner_github_owner|g" \
+      -e "s|CHANGE-ME-github-repo|$runner_github_repo|g" \
       "$src" > "$dst"
     echo "  wrote $dst"
   }
@@ -608,6 +616,7 @@ cmd_seal() {
   # Cluster-only / operator-only — stay prompts.
   ask_file   harvester_kubeconfig_path "Path to Harvester kubeconfig file"
   ask_secret ghcr_pat                  "GHCR personal-access token (read:packages)"
+  ask_secret runner_pat                "GitHub PAT for ARC runner registration (repo scope)"
 
   echo
   echo "  Ingress TLS cert (covers $dcapi_hostname AND $cloudui_hostname)"
@@ -678,6 +687,12 @@ cmd_seal() {
   seal_dockerconfig sealed-ghcr-pull-secret-flux-system.yaml     ghcr-pull-secret flux-system     "$ghcr_org" "$ghcr_pat"
   seal_dockerconfig sealed-ghcr-pull-secret-keyvault-system.yaml ghcr-pull-secret keyvault-system "$ghcr_org" "$ghcr_pat"
 
+  # GitHub runner PAT — read by the ARC runner scale-set HelmRelease in
+  # arc-runners. The key name `github_token` matches what the
+  # gha-runner-scale-set chart expects when `githubConfigSecret: github-runner-pat`.
+  seal github-runner-pat arc-runners \
+       --from-literal=github_token="$runner_pat"
+
   # dc-api-tls
   if [[ "$tls_source" == "b" ]]; then
     tls_crt_pem="$(cat "$tls_crt_path")"
@@ -720,6 +735,7 @@ cmd_seal() {
       print "  - ./sealed-ghcr-pull-secret.yaml"
       print "  - ./sealed-ghcr-pull-secret-flux-system.yaml"
       print "  - ./sealed-ghcr-pull-secret-keyvault-system.yaml"
+      print "  - ./sealed-github-runner-pat.yaml"
       skip = 1
       next
     }
