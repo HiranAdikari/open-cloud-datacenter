@@ -373,16 +373,42 @@ git_commit_push() {
       ahead="new-branch"
     fi
 
+    # Helper: try `git push`; if it fails because remote moved (fast-
+    # forward conflict — most often because flux_bootstrap_git's
+    # auto-commits landed between the operator's last fetch and now),
+    # auto-rebase onto the remote and try once more. Real conflicts
+    # (e.g. the operator hand-edited something that flux_bootstrap_git
+    # also touched) abort the rebase and tell the operator what to do.
+    try_push() {
+      if git push -u "$git_remote" "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
+        return 0
+      fi
+      echo "  ! push rejected (remote moved); auto-rebasing onto $git_remote/$branch"
+      git fetch "$git_remote" "$branch" >/dev/null 2>&1 || true
+      if ! git pull --rebase "$git_remote" "$branch" >/dev/null 2>&1; then
+        git rebase --abort >/dev/null 2>&1 || true
+        echo "  ✗ auto-rebase hit a conflict — needs manual resolution:" >&2
+        echo "      cd $consumer_dir" >&2
+        echo "      git pull --rebase $git_remote $branch" >&2
+        echo "      # resolve conflicts, then:" >&2
+        echo "      git push $git_remote HEAD:refs/heads/$branch" >&2
+        return 1
+      fi
+      if git push -u "$git_remote" "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
+        return 0
+      fi
+      echo "  ✗ push still failed after rebase" >&2
+      return 1
+    }
+
     case "$ahead" in
       0)
         echo "  ✓ $git_remote/$branch already at HEAD — nothing to push"
         ;;
       new-branch)
-        if git push -u "$git_remote" "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
+        if try_push; then
           echo "  ✓ pushed (created $git_remote/$branch)"
         else
-          echo "  ✗ push to $git_remote/$branch failed" >&2
-          echo "    retry: cd $consumer_dir && git push -u $git_remote HEAD:refs/heads/$branch" >&2
           return 1
         fi
         ;;
@@ -393,13 +419,13 @@ git_commit_push() {
         # push.default=simple sees a tracking ref with a different name
         # than local HEAD). HEAD:refs/heads/X tells git unambiguously:
         # push my current commit to branch X on origin.
-        if git push -u "$git_remote" "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
-          echo "  ✓ pushed $ahead commit(s) to $git_remote/$branch"
+        if try_push; then
+          # Re-count ahead after potential rebase + push (where the
+          # original local SHA may have been replayed).
+          local pushed
+          pushed=$(git rev-list --count "$git_remote/$branch@{1}..$git_remote/$branch" 2>/dev/null || echo "$ahead")
+          echo "  ✓ pushed $pushed commit(s) to $git_remote/$branch"
         else
-          echo "  ✗ push to $git_remote/$branch failed ($ahead local commits ahead)" >&2
-          echo "    likely a fast-forward conflict — pull first:" >&2
-          echo "      cd $consumer_dir && git pull --rebase $git_remote $branch" >&2
-          echo "    then re-run this wizard subcommand" >&2
           return 1
         fi
         ;;
