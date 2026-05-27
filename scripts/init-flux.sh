@@ -840,6 +840,23 @@ trigger_initial_image_builds() {
   local src_repo="HiranAdikari/sovereign-cloud"
   local wf="keyvault-operator.yaml"
 
+  # Cancel any orphan queued runs first. ARC has a known quirk where
+  # jobs queued against a previous (now-dead) listener session never get
+  # re-assigned to a new listener — they sit forever in "waiting for
+  # runner". Wipe them so our fresh dispatch goes to the live listener.
+  local orphans
+  orphans=$(gh run list --repo "$src_repo" --workflow="$wf" --status=queued \
+    --json databaseId --jq '.[].databaseId' 2>/dev/null || true)
+  if [[ -n "$orphans" ]]; then
+    local n
+    n=$(echo "$orphans" | wc -l | tr -d ' ')
+    echo "  - cancelling $n orphan queued run(s) before fresh dispatch"
+    while IFS= read -r run_id; do
+      [[ -z "$run_id" ]] && continue
+      gh run cancel "$run_id" --repo "$src_repo" >/dev/null 2>&1 || true
+    done <<<"$orphans"
+  fi
+
   echo "  - triggering $wf on $src_repo (ref: main)"
   if gh workflow run "$wf" --repo "$src_repo" --ref main >/dev/null 2>&1; then
     echo "  ✓ workflow_dispatch sent — dc-runner will pick it up shortly"
