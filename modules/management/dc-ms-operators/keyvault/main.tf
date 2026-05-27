@@ -706,7 +706,11 @@ resource "kubernetes_manifest" "kv_service_monitor" {
           scheme          = "https"
           bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
           tlsConfig = {
+            serverName         = null
             insecureSkipVerify = true
+            ca                 = null
+            cert               = null
+            keySecret          = null
           }
         }
       ]
