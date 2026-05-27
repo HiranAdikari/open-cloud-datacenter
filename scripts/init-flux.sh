@@ -479,13 +479,15 @@ cmd_init() {
   # workflow in repo-A whose `runs-on: dc-runner` won't match a
   # runner registered to repo-B.
   #
-  # No defaults — every consumer's source repo is different (or merged
-  # into OCD post-spike). Operator supplies both.
+  # Read from the 06-flux-bootstrap layer's `runner_github_owner` +
+  # `runner_github_repo` outputs (consumer sets these in tfvars).
+  # Falls back to prompt if those outputs aren't set yet.
   echo
   echo "  ℹ  ARC runner repo: the SOURCE repo where your CI workflows live"
   echo "     (.github/workflows/*.yaml). NOT the consumer/Flux-state repo."
-  ask runner_github_owner "GitHub owner of the SOURCE repo (where workflows live)" "" "$SLUG_RE"
-  ask runner_github_repo  "GitHub repo name of the SOURCE repo"                   "" "$SLUG_RE"
+  echo "     Auto-resolved from 06-flux-bootstrap tfvars when set there."
+  auto_or_ask runner_github_owner "GitHub owner of the SOURCE repo (where workflows live)" "flux-bootstrap" "runner_github_owner" "" "$SLUG_RE"
+  auto_or_ask runner_github_repo  "GitHub repo name of the SOURCE repo"                   "flux-bootstrap" "runner_github_repo"  "" "$SLUG_RE"
   auto_or_ask dc_api_tag          "Initial dc-api image tag"  "flux-bootstrap"   "dc_api_initial_tag"           "latest"
   auto_or_ask cloud_ui_tag        "Initial cloud-ui image tag" "flux-bootstrap"  "cloud_ui_initial_tag"         "latest"
   # keyvault-operator image tag is set by the TF module that deploys
