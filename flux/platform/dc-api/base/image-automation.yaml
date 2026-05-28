@@ -26,12 +26,16 @@ metadata:
 spec:
   imageRepositoryRef:
     name: dc-api
-  # Accepts both bare 40-char commit SHAs (today's wso2 CI tag format) and
-  # `main-<short-sha>` (Flux-native semver-ish alternative used by some
-  # downstream forks). Override in your overlay if your CI tags differently.
+  # Filter on the timestamp-prefixed tag format that the OCD workflows
+  # publish: <YYYYMMDD>-<HHMMSS>-<git-sha>. The ts capture group extracts
+  # 14 decimal digits we then sort numerically — picks the most recently
+  # built image. Bare-SHA tags (the previous format) are deliberately NOT
+  # matched here; alphabetical-sort of hex SHAs is meaningless and
+  # previously pinned us on whatever SHA happened to start with "ff",
+  # missing every newer build.
   filterTags:
-    pattern: '^(?P<sha>[a-f0-9]{7,40})$'
-    extract: '$sha'
+    pattern: '^(?P<ts>\d{8}-\d{6})-[a-f0-9]+$'
+    extract: '$ts'
   policy:
-    alphabetical:
+    numerical:
       order: asc
