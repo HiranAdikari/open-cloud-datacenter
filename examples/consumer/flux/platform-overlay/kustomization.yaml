@@ -92,11 +92,27 @@ patches:
   # per-repo; `runs-on: dc-runner` in source-repo workflows only
   # matches a runner registered to that repo. PAT secret name stays
   # as github-runner-pat — that's what the wizard's seal step writes.
+  #
+  # Also overrides the runner container image with a "fat" dc-runner
+  # built from the consumer's CI (extends actions/actions-runner with
+  # make, build-essential, kubectl, helm, yq — the toolkit any
+  # Makefile-driven Go project or kubectl-touching workflow needs).
+  # The chart's containerMode:dind helper looks up containers[0] by
+  # name=runner and overlays the dind env/volume wiring on top.
+  # Default below assumes the consumer publishes dc-runner under the
+  # same GHCR org as dc-api/cloud-ui; edit the image ref if you build
+  # it elsewhere.
   - target: { kind: HelmRelease, name: dc-runner, namespace: arc-runners }
     patch: |-
       - op: replace
         path: /spec/values/githubConfigUrl
         value: "https://github.com/CHANGE-ME-github-owner/CHANGE-ME-github-repo"
+      - op: add
+        path: /spec/values/template/spec/containers
+        value:
+          - name: runner
+            image: ghcr.io/CHANGE-ME-org/dc-runner:latest
+            command: ["/home/runner/run.sh"]
 
 # Swap the placeholder ghcr.io/wso2/* images in the OCD base Deployments
 # for this consumer's actual builds + pin an initial tag. The
