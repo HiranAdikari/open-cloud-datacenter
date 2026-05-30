@@ -11,9 +11,14 @@ Turn an on-prem datacenter into a self-service cloud. OCD is an open, modular co
 
 ## See it in action
 
-Provision a virtual network and subnet from the CLI with `dcctl`:
+The same control plane, two ways — provision a virtual network from the **CLI** or the **web console**:
 
-![dcctl creating a VNet and subnet](docs/media/dcctl-vnet-demo.gif)
+<table>
+<tr>
+<td width="50%" valign="top"><strong><code>dcctl</code> — CLI</strong><br/><br/><img src="docs/media/dcctl-vnet-demo.gif" alt="dcctl creating a VNet and subnet" width="100%"></td>
+<td width="50%" valign="top"><strong>Web console</strong><br/><br/><img src="docs/media/cloudui-vnet-demo.gif" alt="Creating a VNet in the web console" width="100%"></td>
+</tr>
+</table>
 
 ## How this repo is organized
 
