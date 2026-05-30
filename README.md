@@ -9,6 +9,12 @@ Turn an on-prem datacenter into a self-service cloud. OCD is an open, modular co
 
 > ℹ️ **This `main` branch is the index — it carries no code.** The work lives on three branches, mapped below. `main` is intentionally kept as the front door + roadmap.
 
+## See it in action
+
+Provision a virtual network and subnet from the CLI with `dcctl`:
+
+![dcctl creating a VNet and subnet](docs/media/dcctl-vnet-demo.gif)
+
 ## How this repo is organized
 
 ```text
