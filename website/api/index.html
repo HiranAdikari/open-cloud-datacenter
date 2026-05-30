@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>API Reference — OpenStrato</title>
+<meta name="description" content="OpenStrato control-plane REST API reference, generated from the OpenAPI specification." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/tokens.css">
+<style>
+  /* Minimal, scoped chrome so Redoc renders cleanly below it. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-sans); color: var(--ink); background: var(--bg); }
+  .topbar {
+    display: flex; align-items: center; gap: var(--sp-5);
+    height: var(--nav-h); padding: 0 var(--sp-5);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--bg); z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+  .brand__mark { width: 28px; height: 28px; }
+  .brand__name { font-weight: 600; letter-spacing: var(--ls-tight); }
+  .brand__name b { font-weight: 700; }
+  .brand__name span { color: var(--secondary); }
+  .topbar nav { display: flex; gap: var(--sp-4); margin-left: var(--sp-4); }
+  .topbar nav a { text-decoration: none; color: var(--secondary); font-size: var(--t-sm); font-weight: 500; }
+  .topbar nav a.active, .topbar nav a:hover { color: var(--ink); }
+  .topbar .spacer { flex: 1; }
+  .topbar .ghlink { color: var(--secondary); display: inline-flex; }
+  .topbar .ghlink:hover { color: var(--ink); }
+  redoc { display: block; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../index.html" aria-label="OpenStrato home">
+      <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="var(--accent)"/>
+        <rect x="8" y="9" width="16" height="3" rx="1.5" fill="#fff"/>
+        <rect x="8" y="14.5" width="16" height="3" rx="1.5" fill="#fff" opacity="0.7"/>
+        <rect x="8" y="20" width="10" height="3" rx="1.5" fill="#fff" opacity="0.45"/>
+      </svg>
+      <span class="brand__name"><b>Open</b><span>Strato</span></span>
+    </a>
+    <nav>
+      <a href="../docs/index.html">Docs</a>
+      <a href="index.html" class="active">API</a>
+      <a href="../docs/cli/index.html">CLI</a>
+    </nav>
+    <span class="spacer"></span>
+    <a class="ghlink" href="#" aria-label="GitHub">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
+    </a>
+  </header>
+
+  <!-- Real API reference rendered from the project's actual OpenAPI spec. -->
+  <redoc spec-url="./openapi.yaml"
+         theme='{"colors":{"primary":{"main":"#2563EB"}},"typography":{"fontFamily":"Geist, system-ui, sans-serif","code":{"fontFamily":"JetBrains Mono, ui-monospace, monospace"}},"sidebar":{"width":"280px"}}'></redoc>
+  <script src="https://cdn.jsdelivr.net/npm/redoc@2/bundles/redoc.standalone.js"></script>
+</body>
+</html>

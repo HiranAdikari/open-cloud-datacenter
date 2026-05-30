@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-density="comfortable">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Operations bootstrap — OpenStrato Docs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/main.css">
+<link rel="stylesheet" href="../styles/docs.css">
+</head>
+<body>
+<a class="skip-link" href="#doc">Skip to content</a>
+<header class="nav">
+  <div class="nav__inner container" style="max-width:1440px">
+    <button class="icon-btn docnav-toggle" id="docnavToggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <a class="brand" href="../index.html"><svg class="brand__mark" viewBox="0 0 32 32" fill="none"><rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="var(--accent)"/><rect x="8" y="9" width="16" height="3" rx="1.5" fill="#fff"/><rect x="8" y="14.5" width="16" height="3" rx="1.5" fill="#fff" opacity="0.7"/><rect x="8" y="20" width="10" height="3" rx="1.5" fill="#fff" opacity="0.45"/></svg><span class="brand__name"><b>Open</b><span>Strato</span></span></a>
+    <nav class="nav__links" aria-label="Primary">
+      <a class="nav__link" href="index.html" style="color:var(--ink)">Docs</a>
+      <a class="nav__link" href="../api/index.html">API</a>
+      <a class="nav__link" href="cli/index.html">CLI</a>
+    </nav>
+    <div class="nav__spacer"></div>
+    <div class="nav__actions">
+      <button class="icon-btn theme-toggle" data-action="toggle-theme" aria-label="Toggle theme"><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg></button>
+      <a class="icon-btn" href="#" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg></a>
+    </div>
+  </div>
+</header>
+<div class="docshell">
+  <aside class="docnav" id="docnav"><div class="docnav__group"><div class="docnav__title" data-collapse>Getting started <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div><div class="docnav__list"><a href="local-dev.html">Local development</a></div></div><div class="docnav__group"><div class="docnav__title" data-collapse>Concepts <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div><div class="docnav__list"><a href="architecture.html">Architecture</a></div></div><div class="docnav__group"><div class="docnav__title" data-collapse>Security <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div><div class="docnav__list"><a href="rbac.html">RBAC & roles</a></div></div><div class="docnav__group"><div class="docnav__title" data-collapse>Operations <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div><div class="docnav__list"><a href="ops-bootstrap.html" class="is-active">Operations bootstrap</a></div></div></aside>
+  <main class="doccontent" id="doc"><article class="prose" style="max-width:860px"><div class="callout callout--note"><svg class="callout__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div class="callout__body">Imported verbatim from the project's <code>docs/ops-bootstrap.md</code>. Some pages still carry upstream "Sovereign Cloud / Asgardeo" wording, pending a generic pass.</div></div><h1>Operations Bootstrap — DC-API on a New Datacenter</h1>
+<p>This runbook documents the manual steps required to bootstrap DC-API onto a new datacenter.
+Everything here is currently done manually for the LK dev environment.
+Eventually these steps will move into Terraform (see <a href="../MILESTONES.md">MILESTONES.md</a> &quot;DC-API Bootstrap&quot;).</p>
+<p>Audience: IaaS team members setting up a new datacenter region from scratch.</p>
+<hr>
+<h2>Prerequisites</h2>
+<p>Before starting:</p>
+<ul>
+<li>A <strong>Harvester cluster</strong> is already running and stable</li>
+<li><strong>Rancher</strong> is managing Harvester (Rancher sees Harvester as a local cluster)</li>
+<li>VPN access to the datacenter management network (e.g., <code>192.168.x.x</code>)</li>
+<li>Local tools installed: <code>kubectl</code>, <code>helm</code>, <code>gh</code> (GitHub CLI)</li>
+<li>GitHub repo access: <code>HiranAdikari/sovereign-cloud</code> (for deployment manifests)</li>
+<li>Docker installed locally (to pull and inspect images)</li>
+</ul>
+<p>Estimate time: 45–60 minutes for a dev environment. Production with HA will take longer.</p>
+<hr>
+<h2>Step 1: Create the DC-API RKE2 Cluster in Rancher</h2>
+<p>DC-API runs in its own RKE2 cluster (separate from Harvester).
+This cluster hosts PostgreSQL, DC-API, and the nginx ingress controller.</p>
+<h3>Via Rancher UI</h3>
+<ol>
+<li>Open Rancher: <code>https://rancher.internal.wso2.com</code></li>
+<li>Go to <strong>Cluster Management</strong> → <strong>Create</strong></li>
+<li>Select <strong>RKE2</strong></li>
+<li>Select <strong>Harvester</strong> as the infrastructure provider</li>
+<li>Fill in cluster details:<ul>
+<li><strong>Cluster Name</strong>: <code>dc-api-control-plane</code> (or region-specific name like <code>dc-api-eu</code>)</li>
+<li><strong>Description</strong>: &quot;DC-API control plane for region&quot;</li>
+</ul>
+</li>
+<li>Under <strong>Machine Pools</strong>:<ul>
+<li><strong>Harvester Image</strong>: Use an RKE2-compatible image (e.g., Ubuntu 22.04 with cloud-init)</li>
+<li><strong>CPU Count</strong>: 4 (dev: 2 minimum)</li>
+<li><strong>Memory</strong>: 8 GiB (dev: 4 GiB minimum)</li>
+<li><strong>Disk Size</strong>: 50 GiB</li>
+<li><strong>Network</strong>: Must be the <strong>management network</strong> (e.g., <code>vm-net-mgmt</code>)</li>
+<li><strong>Node Count</strong>: 1 for dev; 3 for HA production</li>
+</ul>
+</li>
+<li>Under <strong>Networking</strong>:<ul>
+<li><strong>Project Network</strong>: Select the project where Harvester is running</li>
+</ul>
+</li>
+<li>Under <strong>Add-ons</strong>:<ul>
+<li><strong>Nginx Ingress</strong>: <strong>Enabled</strong> (required; DC-API ingress depends on this)</li>
+<li><strong>Harvester Cloud Provider</strong>: <strong>Enabled</strong> (allows RKE2 VMs to get storage/networking from Harvester)</li>
+</ul>
+</li>
+<li>Click <strong>Create</strong></li>
+</ol>
+<p>Wait 5–10 minutes for the cluster to transition from <code>provisioning</code> → <code>active</code>.
+Check Rancher UI for any stuck provisioning steps (usually in node provisioning or waiting for API).</p>
+<h3>Merge kubeconfig locally</h3>
+<p>Once active, download the kubeconfig:</p>
+<pre><code class="language-bash"># Via Rancher UI: Cluster → Kubeconfig File → Copy to clipboard
+# or download directly
+CLUSTER_ID=&quot;c-xxxxx&quot;  # from Rancher URL
+curl -s -H &quot;Authorization: Bearer $RANCHER_TOKEN&quot; \
+  &quot;https://rancher.internal.wso2.com/v3/clusters/$CLUSTER_ID?action=generateKubeconfig&quot; \
+  | jq -r &#39;.config&#39; &gt; /tmp/dcapi-rke2.yaml
+
+# Merge into ~/.kube/config
+KUBECONFIG=~/.kube/config:/tmp/dcapi-rke2.yaml kubectl config view --flatten &gt; /tmp/merged &amp;&amp; mv /tmp/merged ~/.kube/config
+
+# Rename the context for clarity
+kubectl config rename-context &quot;$CLUSTER_ID&quot; &quot;dcapi-controlplane-rke2&quot;
+
+# Verify
+kubectl --context dcapi-controlplane-rke2 get nodes
+</code></pre>
+<p>Expected output: one or three nodes in <code>Ready</code> status.</p>
+<hr>
+<h2>Step 2: Create Harvester IP Pool for Ingress LoadBalancer</h2>
+<p>The RKE2 nginx ingress controller needs a static IP from the Harvester management network.
+This IP will be assigned to the nginx LoadBalancer service.</p>
+<h3>Create the IP pool on Harvester</h3>
+<p>First, switch to the <strong>Harvester</strong> cluster context:</p>
+<pre><code class="language-bash">kubectl config use-context harvester-dev  # or your Harvester context name
+</code></pre>
+<p>Create the IP pool. Edit this manifest with your network details, then apply:</p>
+<pre><code class="language-yaml"># harvester-ippool.yaml
+apiVersion: network.harvesterhci.io/v1beta1
+kind: IPPool
+metadata:
+  name: dc-api-ingress-pool
+  namespace: harvester-public  # or your Harvester network namespace
+spec:
+  ipv4Config:
+    pools:
+      - start: 192.168.10.37
+        end: 192.168.10.37
+    serverIP: 192.168.10.1      # Your management network gateway
+    cidr: 192.168.10.0/24
+    excludedAddresses: []
+  description: &quot;DC-API ingress LB IP&quot;
+  # The &#39;scope&#39; field ties this pool to the RKE2 cluster&#39;s namespace
+  scope:
+    project: &quot;c-xxxxx&quot;  # Replace with Rancher project ID of your dc-api cluster
+</code></pre>
+<p><strong>Where to find the Rancher project ID:</strong></p>
+<p>In the Rancher UI, go to your dc-api cluster → Namespaces.
+Click into any namespace and check the URL: <code>https://rancher.../p/c-xxxxx/explorer</code>.
+The <code>c-xxxxx</code> is the project ID.</p>
+<p>Or fetch it via kubectl:</p>
+<pre><code class="language-bash">kubectl --context dcapi-controlplane-rke2 get namespace dc-system -o jsonpath=&#39;{.metadata.annotations.project\.cattle\.io/projectId}&#39; 2&gt;/dev/null || \
+  echo &quot;Project ID not yet set; check Rancher UI&quot;
+</code></pre>
+<p>Apply the IP pool to Harvester:</p>
+<pre><code class="language-bash">kubectl --context harvester-dev apply -f harvester-ippool.yaml
+</code></pre>
+<p>Verify:</p>
+<pre><code class="language-bash">kubectl --context harvester-dev get ippool
+# Should show: dc-api-ingress-pool with status Ready
+</code></pre>
+<hr>
+<h2>Step 3: Create nginx LoadBalancer Service</h2>
+<p>Switch back to the <strong>DC-API RKE2 cluster</strong>:</p>
+<pre><code class="language-bash">kubectl config use-context dcapi-controlplane-rke2
+</code></pre>
+<p>Create a LoadBalancer service that ties the nginx ingress to the Harvester IP pool.
+This is a <strong>one-time setup</strong> — nginx ingress is usually auto-installed, but it may not have the LoadBalancer type.</p>
+<pre><code class="language-yaml"># ingress-lb.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-expose
+  namespace: kube-system
+  annotations:
+    network.harvesterhci.io/ipPool: &quot;dc-api-ingress-pool&quot;
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/instance: nginx-ingress
+    app.kubernetes.io/name: ingress-nginx
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 80
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 443
+</code></pre>
+<p>Apply:</p>
+<pre><code class="language-bash">kubectl apply -f ingress-lb.yaml
+</code></pre>
+<p>Wait for an external IP to be assigned:</p>
+<pre><code class="language-bash">kubectl get svc -n kube-system ingress-expose --watch
+# Wait for EXTERNAL-IP column to show 192.168.10.37
+</code></pre>
+<p>Expected output:</p>
+<pre><code>NAME             TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)
+ingress-expose   LoadBalancer   10.43.x.x       192.168.10.37   80:xxxxx/TCP,443:xxxxx/TCP
+</code></pre>
+<hr>
+<h2>Step 4: Create Namespaces and ConfigMap</h2>
+<p>All DC-API components live in the <code>dc-system</code> namespace.</p>
+<h3>Create namespace</h3>
+<pre><code class="language-yaml"># namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dc-system
+  labels:
+    app: dc-api
+</code></pre>
+<p>Apply:</p>
+<pre><code class="language-bash">kubectl apply -f namespace.yaml
+</code></pre>
+<h3>Create ConfigMap</h3>
+<p>The ConfigMap holds non-secret DC-API environment variables.
+See <a href="../CLAUDE.md">CLAUDE.md</a> &quot;Environment Variables (DC-API)&quot; for the full list.</p>
+<pre><code class="language-yaml"># configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dc-api-config
+  namespace: dc-system
+data:
+  DCAPI_LOG_LEVEL: &quot;info&quot;
+  DCAPI_LISTEN_ADDR: &quot;:8080&quot;
+  DCAPI_HARVESTER_NAMESPACE: &quot;harvester-vms&quot;  # or your namespace
+  DCAPI_RANCHER_INSECURE: &quot;false&quot;  # set to &quot;true&quot; if using self-signed certs in dev
+  DCAPI_VM_PROVIDER: &quot;harvester&quot;
+  DCAPI_CLUSTER_PROVIDER: &quot;rancher&quot;
+  DCAPI_TENANT_GROUP_PREFIX: &quot;dc-tenant-&quot;     # Asgardeo groups like &quot;dc-tenant-acme&quot;
+  DCAPI_ADMIN_GROUP: &quot;dc-admin&quot;               # Asgardeo group for platform admins
+  # Add any other non-secret DCAPI_* variables here
+</code></pre>
+<p>Apply:</p>
+<pre><code class="language-bash">kubectl apply -f configmap.yaml
+</code></pre>
+<hr>
+<h2>Step 5: Create Secrets</h2>
+<p>Secrets hold sensitive values (database password, API tokens, kubeconfigs).
+<strong>Never commit these to git.</strong></p>
+<p>Create them interactively using <code>create-secrets.sh</code> or manually via <code>kubectl</code>:</p>
+<h3>Option A: Interactive script (recommended)</h3>
+<pre><code class="language-bash">cd dc-api/deploy &amp;&amp; ./create-secrets.sh --context dcapi-controlplane-rke2
+</code></pre>
+<p>Provide these values when prompted:</p>
+<ol>
+<li><strong>PostgreSQL password</strong> (anything; used to build <code>DCAPI_DB_URL</code>)</li>
+<li><strong>Asgardeo OIDC client ID</strong> (from Asgardeo UI → Applications → DC-API → Client ID)</li>
+<li><strong>Asgardeo OIDC audience</strong> (same as client ID)</li>
+<li><strong>Path to Harvester kubeconfig</strong> (e.g., <code>~/.kube/harvester-dev.yaml</code>)</li>
+<li><strong>Rancher API token</strong> (Rancher UI → User Settings → API Keys → Create; no scope, no expiry)</li>
+<li><strong>Rancher base URL</strong> (e.g., <code>https://rancher.internal.wso2.com</code>)</li>
+<li><strong>Operator SSH public key</strong> (optional; for break-glass access)</li>
+<li><strong>Operator console password</strong> (optional; for VNC access)</li>
+</ol>
+<p>The script will create a <code>Secret</code> resource in <code>dc-system</code> with all values base64-encoded.</p>
+<h3>Option B: Manual kubectl</h3>
+<pre><code class="language-bash"># Encode the Harvester kubeconfig (base64)
+base64 &lt; ~/.kube/harvester-dev.yaml &gt; /tmp/hc.b64
+
+# Create the secret
+kubectl --context dcapi-controlplane-rke2 create secret generic dc-api-secrets \
+  -n dc-system \
+  --from-literal=DCAPI_DB_URL=&quot;postgres://dc_api:PASSWORD@postgres:5432/dc_api?sslmode=disable&quot; \
+  --from-literal=DCAPI_OIDC_ISSUER=&quot;https://api.asgardeo.io/t/wso2&quot; \
+  --from-literal=DCAPI_OIDC_AUDIENCE=&quot;YOUR_CLIENT_ID&quot; \
+  --from-literal=DCAPI_HARVESTER_KUBECONFIG=&quot;$(base64 &lt; ~/.kube/harvester-dev.yaml)&quot; \
+  --from-literal=DCAPI_RANCHER_URL=&quot;https://rancher.internal.wso2.com&quot; \
+  --from-literal=DCAPI_RANCHER_TOKEN=&quot;token-xxxxx:yyyyy&quot;
+</code></pre>
+<p>Verify:</p>
+<pre><code class="language-bash">kubectl --context dcapi-controlplane-rke2 get secrets -n dc-system
+# Should show: dc-api-secrets
+</code></pre>
+<hr>
+<h2>Step 6: Create GitHub Container Registry (GHCR) Image Pull Secret</h2>
+<p>DC-API is built and pushed to <code>ghcr.io/hiranadikari/dc-api</code>.
+The image is private; Kubernetes needs credentials to pull it.</p>
+<h3>Create GitHub Personal Access Token (PAT)</h3>
+<ol>
+<li>Go to <a href="https://github.com/settings/tokens">github.com/settings/tokens</a></li>
+<li>Click <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong></li>
+<li>Scopes: select <strong><code>read:packages</code></strong> only</li>
+<li>No expiry (or set long expiry)</li>
+<li>Generate and copy the token (you&#39;ll use it once)</li>
+</ol>
+<h3>Create the image pull secret</h3>
+<pre><code class="language-bash">kubectl --context dcapi-controlplane-rke2 create secret docker-registry ghcr-pull-secret \
+  -n dc-system \
+  --docker-server=ghcr.io \
+  --docker-username=HiranAdikari \
+  --docker-password=&lt;GITHUB_PAT&gt; \
+  --docker-email=hiranadikari993@gmail.com
+</code></pre>
+<p>Verify:</p>
+<pre><code class="language-bash">kubectl --context dcapi-controlplane-rke2 get secrets -n dc-system ghcr-pull-secret
+</code></pre>
+<hr>
+<h2>Step 7: Deploy PostgreSQL</h2>
+<p>DC-API needs a PostgreSQL 16+ database.
+We run it as a StatefulSet in the same cluster for simplicity.
+(Production would use a managed PostgreSQL service.)</p>
+<pre><code class="language-yaml"># postgres.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: dc-system
+  labels:
+    app: postgres
+spec:
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: dc-system
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: &quot;dc_api&quot;
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dc-api-secrets
+                  key: DCAPI_DB_PASSWORD
+            - name: POSTGRES_DB
+              value: &quot;dc_api&quot;
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command: [&quot;pg_isready&quot;, &quot;-U&quot;, &quot;dc_api&quot;]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: [&quot;ReadWriteOnce&quot;]
+        storageClassName: &quot;harvester&quot;  # Harvester storage class
+        resources:
+          requests:
+            storage: 20Gi
+</code></pre>
+<p>Apply:</p>
+<pre><code class="language-bash">kubectl apply -f postgres.yaml
+</code></pre>
+<p>Wait for the StatefulSet to be ready:</p>
+<pre><code class="language-bash">kubectl get statefulset -n dc-system postgres --watch
+# Wait for: postgres   1/1   1            1           ~1m
+</code></pre>
+<p>Verify database connectivity from inside the cluster:</p>
+<pre><code class="language-bash">kubectl run -it --rm debug --image=postgres:16-alpine --restart=Never -n dc-system -- \
+  psql -h postgres -U dc_api -d dc_api -c &quot;SELECT version();&quot;
+</code></pre>
+<hr>
+<h2>Step 8: Deploy DC-API Deployment</h2>
+<p>The Deployment runs the DC-API binary, pulls config from ConfigMap and secrets, and exposes port 8080 internally.</p>
+<pre><code class="language-yaml"># deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dc-api
+  namespace: dc-system
+  labels:
+    app: dc-api
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: dc-api
+  template:
+    metadata:
+      labels:
+        app: dc-api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: dc-api
+          image: ghcr.io/hiranadikari/dc-api:latest  # or a specific SHA tag
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: dc-api-config
+            - secretRef:
+                name: dc-api-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dc-api
+  namespace: dc-system
+  labels:
+    app: dc-api
+spec:
+  type: ClusterIP
+  selector:
+    app: dc-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+</code></pre>
+<p>Apply:</p>
+<pre><code class="language-bash">kubectl apply -f deployment.yaml
+</code></pre>
+<p>Wait for the deployment to roll out:</p>
+<pre><code class="language-bash">kubectl rollout status deployment/dc-api -n dc-system
+</code></pre>
+<p>Check logs:</p>
+<pre><code class="language-bash">kubectl logs -f deployment/dc-api -n dc-system
+# Should show: &quot;DC-API starting&quot;, &quot;PostgreSQL migration successful&quot;, etc.
+</code></pre>
+<hr>
+<h2>Step 9: Create nginx Ingress</h2>
+<p>Expose DC-API over HTTPS via the nginx ingress controller and the LoadBalancer service from Step 3.</p>
+<pre><code class="language-yaml"># ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dc-api
+  namespace: dc-system
+  annotations:
+    cert-manager.io/cluster-issuer: &quot;letsencrypt-prod&quot;  # if using cert-manager
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: dcapi.lk.internal.wso2.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dc-api
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - dcapi.lk.internal.wso2.com
+      secretName: dcapi-tls
+</code></pre>
+<p>Apply:</p>
+<pre><code class="language-bash">kubectl apply -f ingress.yaml
+</code></pre>
+<p>Verify:</p>
+<pre><code class="language-bash">kubectl get ingress -n dc-system
+# Should show: dc-api with HOSTS and ADDRESS
+</code></pre>
+<hr>
+<h2>Step 10: Set DNS / Hosts Entry</h2>
+<p>Add the ingress IP to your local <code>/etc/hosts</code> or your DNS server:</p>
+<pre><code class="language-bash"># /etc/hosts (local machine, VPN connected)
+192.168.10.37  dcapi.lk.internal.wso2.com
+
+# Or via DNS (if you have a DNS server managing the domain)
+A record: dcapi.lk.internal.wso2.com → 192.168.10.37
+</code></pre>
+<p>Test connectivity:</p>
+<pre><code class="language-bash">curl -i https://dcapi.lk.internal.wso2.com/health
+# Expected: 200 OK
+</code></pre>
+<hr>
+<h2>Step 11 (Optional): Set Up GitHub Actions Self-Hosted Runner</h2>
+<p>The GitHub Actions workflow in <code>.github/workflows/deploy.yaml</code> builds and deploys DC-API automatically on every push to <code>main</code> touching <code>dc-api/</code>.</p>
+<p>To avoid exposing Kubernetes APIs publicly, run the runner <strong>inside the cluster</strong> using GitHub Actions Runner Controller (ARC).</p>
+<h3>Install ARC Helm controller</h3>
+<pre><code class="language-bash">helm repo add gha-runner-scale-set https://actions-runner-controller.github.io/actions-runner-controller
+helm repo update
+
+helm install arc \
+  --kube-context dcapi-controlplane-rke2 \
+  --namespace arc-systems --create-namespace \
+  gha-runner-scale-set/gha-runner-scale-set-controller
+</code></pre>
+<h3>Create a GitHub PAT for the runner</h3>
+<ol>
+<li>Go to <a href="https://github.com/settings/tokens">github.com/settings/tokens</a></li>
+<li><strong>Generate new token (classic)</strong></li>
+<li>Scopes: <strong><code>repo</code></strong> (full control) + <strong><code>workflow</code></strong> (if needed)</li>
+<li>Generate and copy</li>
+</ol>
+<h3>Install the runner scale set</h3>
+<pre><code class="language-bash">helm install dc-runner \
+  --kube-context dcapi-controlplane-rke2 \
+  --namespace arc-runners --create-namespace \
+  --set githubConfigUrl=&quot;https://github.com/HiranAdikari/sovereign-cloud&quot; \
+  --set githubConfigSecret.github_token=&quot;&lt;PAT&gt;&quot; \
+  --set runnerScaleSetName=&quot;dc-runner&quot; \
+  --set containerMode.type=&quot;dind&quot; \
+  gha-runner-scale-set/gha-runner-scale-set
+</code></pre>
+<p>Verify:</p>
+<pre><code class="language-bash">kubectl get runner -n arc-runners --watch
+# Should auto-scale up when jobs are queued
+</code></pre>
+<p>Check runner status in GitHub UI: <strong>Settings</strong> → <strong>Actions</strong> → <strong>Runners</strong> → You should see <code>dc-runner</code> as an &quot;available&quot; self-hosted runner.</p>
+<hr>
+<h2>Step 12: Trigger the First Deploy</h2>
+<p>Push a change to <code>dc-api/</code> on the <code>main</code> branch. The GitHub Actions workflow will:</p>
+<ol>
+<li>Build the Docker image: <code>ghcr.io/hiranadikari/dc-api:&lt;commit-sha&gt;</code></li>
+<li>Push to GHCR</li>
+<li>Deploy to the cluster via <code>kubectl apply</code></li>
+</ol>
+<p>Monitor the deployment:</p>
+<pre><code class="language-bash"># Via GitHub Actions UI
+# or
+kubectl rollout status deployment/dc-api -n dc-system --watch
+</code></pre>
+<hr>
+<h2>Verification Checklist</h2>
+<p>Once everything is deployed, verify each component:</p>
+<pre><code class="language-bash"># Contexts and clusters
+kubectl config get-contexts | grep dcapi
+
+# Namespaces and resources
+kubectl --context dcapi-controlplane-rke2 get all -n dc-system
+
+# PostgreSQL is running and migrated
+kubectl logs -n dc-system statefulset/postgres
+
+# DC-API is running and healthy
+kubectl logs -n dc-system deployment/dc-api | head -50
+
+# Ingress is configured
+kubectl get ingress -n dc-system
+curl -i https://dcapi.lk.internal.wso2.com/health
+
+# LoadBalancer service has an external IP
+kubectl get svc -n kube-system ingress-expose
+</code></pre>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>DC-API pod is crashing</h3>
+<p>Check logs:</p>
+<pre><code class="language-bash">kubectl logs -n dc-system deployment/dc-api --tail=100
+</code></pre>
+<p>Common issues:</p>
+<ul>
+<li><strong>&quot;failed to load configuration&quot;</strong> → Missing or wrong DCAPI_* environment variables. Check <code>configmap.yaml</code> and <code>secret</code> exist.</li>
+<li><strong>&quot;failed to connect to PostgreSQL&quot;</strong> → Database pod not ready or DCAPI_DB_URL is wrong. Verify <code>postgres</code> StatefulSet is running.</li>
+<li><strong>&quot;failed to initialise OIDC&quot;</strong> → DCAPI_OIDC_ISSUER unreachable or invalid token. Check network access and Asgardeo configuration.</li>
+</ul>
+<h3>Ingress shows no IP address</h3>
+<pre><code class="language-bash">kubectl describe ingress dc-api -n dc-system
+</code></pre>
+<p>If EXTERNAL-IP is pending:</p>
+<ol>
+<li>Check LoadBalancer service has an external IP: <code>kubectl get svc -n kube-system ingress-expose</code></li>
+<li>If no external IP, Harvester IP pool may not be properly scoped to the cluster. Verify the project ID in <code>harvester-ippool.yaml</code>.</li>
+</ol>
+<h3>Cannot reach <code>dcapi.lk.internal.wso2.com</code></h3>
+<ol>
+<li>Verify <code>/etc/hosts</code> entry or DNS resolution: <code>nslookup dcapi.lk.internal.wso2.com</code></li>
+<li>Verify VPN is connected to the management network</li>
+<li>Ping the IP: <code>ping 192.168.10.37</code></li>
+<li>Curl the service: <code>curl -v https://dcapi.lk.internal.wso2.com/health</code> (may show TLS errors if cert-manager not configured)</li>
+</ol>
+<h3>GitHub Actions runner doesn&#39;t appear</h3>
+<p>Check ARC controller logs:</p>
+<pre><code class="language-bash">kubectl logs -n arc-systems deployment/gha-runner-scale-set-controller
+</code></pre>
+<p>Ensure the GitHub PAT has the correct scopes and the repository URL is correct.</p>
+<hr>
+<h2>Future: Terraform Bootstrap</h2>
+<p>All steps above will eventually be codified as Terraform in <code>wso2-datacenter-project</code> bootstrap layer.
+Target: New datacenter regions (EU, US) require zero manual steps—just <code>terraform apply</code>.</p>
+<p>See <a href="../MILESTONES.md">MILESTONES.md</a> &quot;DC-API Bootstrap&quot; for tracking.</p>
+<hr>
+<h2>Next Steps After Bootstrap</h2>
+<ol>
+<li>Create Asgardeo groups and users (see <a href="./asgardeo-setup.md">asgardeo-setup.md</a>)</li>
+<li>Test <code>dcctl login</code> from your local machine</li>
+<li>Create your first VM: <code>dcctl create vm --name test-01 --size small</code></li>
+<li>Run the E2E test suite (see <a href="../MILESTONES.md">MILESTONES.md</a>)</li>
+</ol>
+<hr>
+<h2>References</h2>
+<ul>
+<li><a href="../CLAUDE.md">DC-API Architecture</a></li>
+<li><a href="./asgardeo-setup.md">Asgardeo Setup Guide</a></li>
+<li><a href="../MILESTONES.md">Milestones &amp; Current Status</a></li>
+</ul>
+
+</article></main>
+</div>
+<script src="../scripts/site.js"></script>
+<script>document.getElementById("docnavToggle").addEventListener("click",function(){document.getElementById("docnav").classList.toggle("is-open");});</script>
+</body>
+</html>

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-density="comfortable">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Architecture — OpenStrato Docs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/tokens.css">
+<link rel="stylesheet" href="../styles/main.css">
+<link rel="stylesheet" href="../styles/docs.css">
+</head>
+<body>
+<a class="skip-link" href="#doc">Skip to content</a>
+<header class="nav">
+  <div class="nav__inner container" style="max-width:1440px">
+    <button class="icon-btn docnav-toggle" id="docnavToggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <a class="brand" href="../index.html"><svg class="brand__mark" viewBox="0 0 32 32" fill="none"><rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="var(--accent)"/><rect x="8" y="9" width="16" height="3" rx="1.5" fill="#fff"/><rect x="8" y="14.5" width="16" height="3" rx="1.5" fill="#fff" opacity="0.7"/><rect x="8" y="20" width="10" height="3" rx="1.5" fill="#fff" opacity="0.45"/></svg><span class="brand__name"><b>Open</b><span>Strato</span></span></a>
+    <nav class="nav__links" aria-label="Primary">
+      <a class="nav__link" href="index.html" style="color:var(--ink)">Docs</a>
+      <a class="nav__link" href="../api/index.html">API</a>
+      <a class="nav__link" href="cli/index.html">CLI</a>
+    </nav>
+    <div class="nav__spacer"></div>
+    <div class="nav__actions">
+      <button class="icon-btn theme-toggle" data-action="toggle-theme" aria-label="Toggle theme"><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg></button>
+      <a class="icon-btn" href="#" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg></a>
+    </div>
+  </div>
+</header>
+<div class="docshell">
+  <aside class="docnav" id="docnav"><div class="docnav__group"><div class="docnav__title" data-collapse>Getting started <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div><div class="docnav__list"><a href="local-dev.html">Local development</a></div></div><div class="docnav__group"><div class="docnav__title" data-collapse>Concepts <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div><div class="docnav__list"><a href="architecture.html" class="is-active">Architecture</a></div></div><div class="docnav__group"><div class="docnav__title" data-collapse>Security <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div><div class="docnav__list"><a href="rbac.html">RBAC & roles</a></div></div><div class="docnav__group"><div class="docnav__title" data-collapse>Operations <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div><div class="docnav__list"><a href="ops-bootstrap.html">Operations bootstrap</a></div></div></aside>
+  <main class="doccontent" id="doc"><article class="prose" style="max-width:860px"><div class="callout callout--note"><svg class="callout__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div class="callout__body">Imported verbatim from the project's <code>docs/dc-api-architecture.md</code>. Some pages still carry upstream "Sovereign Cloud / Asgardeo" wording, pending a generic pass.</div></div><h1>1. Document Purpose</h1>
+<p>This document describes how DC-API is built — the components that make it up, where they sit, how they communicate, and how the major user-visible flows work end-to-end. It is intended for engineers joining the project and for anyone reviewing the technical design. It deliberately reflects the <strong>current implementation</strong> (M1, plus M1.5 RBAC in design) rather than future milestones; the roadmap lives in <code>MILESTONES.md</code>.</p>
+<p>For the <em>why</em> (the case for building DC-API at all), see <code>dc-api-internal-proposal.md</code>. This document is the <em>what</em> and the <em>how</em>.</p>
+<blockquote>
+<p>Diagrams in this document use a mix of ASCII (component layouts, deployment topology) and Mermaid (sequence flows). Mermaid blocks render natively on GitHub, mermaid.live, or via the <code>mermaid-filter</code> pandoc plugin. For Google Docs, render the Mermaid blocks at mermaid.live and paste images.</p>
+</blockquote>
+<hr>
+<h1>2. System Overview</h1>
+<p>DC-API is a Go REST service that gives WSO2 engineering teams a self-service cloud experience on top of the LK Datacenter. It hides Harvester (the hypervisor) and Rancher (the cluster manager) entirely from tenants. Three clients consume it: the <code>dcctl</code> CLI (built), a forthcoming Terraform provider, and a forthcoming web portal. PostgreSQL is the system of record. Asgardeo provides authentication via OIDC.</p>
+<pre><code>                                ┌──────────────────────────────┐
+                                │       Asgardeo (OIDC)        │
+                                │   Authentication &amp; groups    │
+                                └──────────────┬───────────────┘
+                                               │ JWT validation
+                                               │ (JWKS fetch on startup)
+                                               ▼
+   ┌──────────────┐         HTTPS        ┌─────────────┐         ┌──────────────────┐
+   │   dcctl      │ ───── Bearer JWT ──► │             │ ──────► │   PostgreSQL     │
+   │  (CLI)       │                      │             │ ◄────── │  (state, audit,  │
+   └──────────────┘                      │   DC-API    │         │   quotas)        │
+   ┌──────────────┐                      │  (Go REST)  │         └──────────────────┘
+   │ Terraform    │ ───── Bearer JWT ──► │             │
+   │ Provider     │                      │             │ ──────► ┌──────────────────┐
+   │ (planned)    │                      │             │ ◄────── │   Harvester      │
+   └──────────────┘                      │             │         │  (KubeVirt VMs   │
+   ┌──────────────┐                      │             │         │   via dynamic    │
+   │  Web UI      │ ───── Bearer JWT ──► │             │         │   k8s client)    │
+   │ (planned)    │                      │             │         └──────────────────┘
+   └──────────────┘                      │             │
+                                         │             │ ──────► ┌──────────────────┐
+                                         │             │ ◄────── │   Rancher        │
+                                         │             │         │  (RKE2 clusters  │
+                                         │             │         │   via REST v3)   │
+                                         └─────────────┘         └──────────────────┘
+</code></pre>
+<p>The key design principle: <strong>DC-API owns the contract.</strong> Whatever happens behind the scenes with Rancher/Harvester is implementation detail. Replacing Harvester with OpenStack tomorrow does not change the API surface. Replacing Asgardeo with a different OIDC provider does not change the API surface. This is enforced through the Strategy Pattern (see §5).</p>
+<hr>
+<h1>3. Components</h1>
+<h2>3.1 DC-API server</h2>
+<p>A Go 1.26 REST service. Single binary. Stateless — all state lives in PostgreSQL. Deployed as a Kubernetes Deployment (1 replica today; 2+ for HA when LK dev stabilises) on the <code>dcapi-controlplane-rke2</code> cluster running inside Harvester.</p>
+<p>Responsibilities:</p>
+<ul>
+<li>Validates Asgardeo JWTs on every <code>/v1/*</code> request</li>
+<li>Enforces per-tenant quotas before any backend call</li>
+<li>Generates SSH keys for VMs (returned once to the caller, never stored)</li>
+<li>Proxies state-changing operations to the appropriate provider (Harvester or Rancher)</li>
+<li>Owns a PostgreSQL row for every resource it manages</li>
+<li>Runs a background reconciler that polls providers and syncs state into PostgreSQL</li>
+</ul>
+<p>Key tech: chi router, zerolog structured logging, pgx for PostgreSQL, <code>client-go</code> dynamic client for Harvester, plain <code>net/http</code> for Rancher.</p>
+<h2>3.2 dcctl CLI</h2>
+<p>A Go 1.22 Cobra-based CLI. Built artifact distributed to engineers. Authenticates via OIDC PKCE (no client secret embedded — the binary is public). Stores the access token at <code>~/.dcctl/credentials.json</code> and configuration at <code>~/.dcctl/config.yaml</code>.</p>
+<p>Commands today: <code>login</code>, <code>logout</code>, <code>create vm|cluster|image</code>, <code>list vms|clusters|images</code>, <code>get vm|cluster</code>, <code>delete vm|cluster</code>, <code>kubeconfig</code>. Output formats: <code>text</code> (default) and <code>json</code>.</p>
+<h2>3.3 PostgreSQL (state of record)</h2>
+<p>Three tables: <code>resources</code> (one row per VM/cluster/volume), <code>audit_events</code> (append-only state-change log), <code>quotas</code> (per-tenant limits). UUID primary keys; JSONB metadata column on <code>resources</code> to avoid schema migrations for each new field. Schema lives at <code>dc-api/internal/db/schema.sql</code>. Migration runner applies it on startup if tables don&#39;t exist.</p>
+<h2>3.4 Harvester (compute backend)</h2>
+<p>The hypervisor. DC-API talks to Harvester through the <strong>Kubernetes dynamic client</strong> because Harvester resources are CRDs (KubeVirt <code>VirtualMachine</code>, <code>harvesterhci.io/VirtualMachineImage</code>, etc.) — there is no Harvester REST API or Go SDK. The Harvester driver lives at <code>dc-api/internal/providers/harvester/client.go</code>.</p>
+<h2>3.5 Rancher (cluster backend)</h2>
+<p>Cluster lifecycle (RKE2 provisioning, kubeconfig retrieval). DC-API talks to Rancher via the <strong>REST v3 API</strong> over plain HTTPS, NOT through the rancher2 Terraform provider (which has known RKE2 cluster creation bugs). The Rancher driver lives at <code>dc-api/internal/providers/rancher/client.go</code>.</p>
+<h2>3.6 Asgardeo (identity)</h2>
+<p>Single OIDC provider for the whole platform. DC-API trusts exactly one issuer. Tenant isolation is enforced by Asgardeo groups (<code>dc-tenant-&lt;name&gt;</code>) mapped to DC-API roles in code (not in Rancher configuration). Enterprise tenants use Asgardeo&#39;s federation capability for corporate SSO; DC-API still sees a single trusted issuer.</p>
+<h2>3.7 GitHub Actions ARC runner (CI/CD)</h2>
+<p>A self-hosted runner (<code>actions-runner-controller</code>, scale-set model) runs in-cluster on the same RKE2 cluster as DC-API. Deploy workflow on push to <code>main</code> builds the image, pushes to ghcr.io, and rolls out the new deployment using the runner pod&#39;s mounted ServiceAccount token. No external <code>KUBECONFIG</code> secret is needed — the runner is in-cluster.</p>
+<hr>
+<h1>4. Code Structure</h1>
+<pre><code>sovereign-cloud/
+├── dc-api/                              ← The Go REST server
+│   ├── cmd/dc-api/main.go               ← Entry point: env loading, signal handling, graceful shutdown
+│   ├── go.mod                           ← module: github.com/wso2/dc-api, go 1.26
+│   ├── Dockerfile                       ← Multi-stage; ships distroless/static:nonroot
+│   ├── deploy/
+│   │   ├── deployment.yaml              ← Kubernetes Deployment + Service
+│   │   ├── ingress.yaml                 ← nginx Ingress for dcapi.lk.internal.wso2.com
+│   │   ├── ingress-lb.yaml              ← LoadBalancer service for nginx ingress
+│   │   ├── postgres.yaml                ← PostgreSQL StatefulSet + PVC (Harvester CSI)
+│   │   ├── configmap.yaml               ← Non-secret config (DCAPI_OIDC_ISSUER etc.)
+│   │   ├── runner-rbac.yaml             ← ServiceAccount + RBAC for the ARC runner
+│   │   ├── arc-runner-values.yaml       ← Helm values for the runner scale-set
+│   │   └── create-secrets.sh            ← Interactive script for sensitive env vars
+│   └── internal/
+│       ├── config/config.go             ← All DCAPI_* env var loading (12-factor)
+│       ├── models/resource.go           ← Domain types: Resource, VMSpec, ClusterSpec, Quota
+│       ├── db/
+│       │   ├── schema.sql               ← PostgreSQL DDL
+│       │   ├── db.go                    ← Repository pattern: all SQL queries live here
+│       │   └── migrate.go               ← Applies schema on startup if missing
+│       ├── providers/
+│       │   ├── interface.go             ← ComputeProvider + ClusterProvider (Strategy Pattern)
+│       │   ├── factory.go               ← Returns the concrete driver based on env config
+│       │   ├── harvester/client.go      ← Kubernetes dynamic client → KubeVirt CRDs
+│       │   └── rancher/client.go        ← Rancher REST v3
+│       ├── api/
+│       │   ├── middleware/auth.go       ← JWT validation; injects tenantID into context
+│       │   ├── handlers/
+│       │   │   ├── vm.go                ← /v1/virtual-machines, /v1/images, /v1/networks
+│       │   │   └── cluster.go           ← /v1/clusters
+│       │   └── router.go                ← Composition root: chi, middleware, route mounting
+│       └── reconciler/
+│           └── reconciler.go            ← Background goroutine: PENDING/DELETING → real state
+│
+├── dcctl/                               ← The Cobra CLI
+│   ├── main.go
+│   ├── go.mod                           ← module: github.com/wso2/dcctl, go 1.22
+│   ├── cmd/                             ← One file per command (root, login, logout, etc.)
+│   └── internal/
+│       ├── auth/oidc.go                 ← PKCE flow: code_verifier/challenge, callback server
+│       ├── config/config.go             ← ~/.dcctl/config.yaml + ~/.dcctl/credentials.json
+│       └── client/client.go             ← HTTP client; injects Bearer token automatically
+│
+├── docs/                                ← Proposal docs, runbooks, this doc
+└── MILESTONES.md                        ← Roadmap
+</code></pre>
+<hr>
+<h1>5. Design Patterns</h1>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Where it lives</th>
+<th>What it gives us</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Strategy</strong></td>
+<td><code>internal/providers/interface.go</code></td>
+<td>Handlers depend on <code>ComputeProvider</code> / <code>ClusterProvider</code> interfaces only. Swapping Harvester for OpenStack means writing one new struct; nothing else changes.</td>
+</tr>
+<tr>
+<td><strong>Factory</strong></td>
+<td><code>internal/providers/factory.go</code></td>
+<td><code>NewComputeProvider(cfg)</code> returns the right driver based on <code>DCAPI_VM_PROVIDER</code>. Adding a backend = one new case in this factory + one new package.</td>
+</tr>
+<tr>
+<td><strong>Repository</strong></td>
+<td><code>internal/db/db.go</code></td>
+<td>All SQL queries live in one place. Handlers call <code>repo.Create()</code>, never <code>pool.Query()</code>. Tests mock <code>Repository</code>, not the database.</td>
+</tr>
+<tr>
+<td><strong>Dependency Injection</strong></td>
+<td><code>internal/api/router.go</code> (composition root)</td>
+<td><code>RouterDeps</code> struct bundles repo, providers, auth middleware, logger. <code>NewRouter(deps)</code> wires everything. Handlers receive their dependencies via constructor.</td>
+</tr>
+<tr>
+<td><strong>Middleware Chain</strong></td>
+<td><code>internal/api/middleware/auth.go</code></td>
+<td>Auth runs before every <code>/v1/*</code> handler. <code>tenantID</code> and <code>userID</code> are read from request context, never from raw JWT.</td>
+</tr>
+</tbody></table>
+<p>The Strategy Pattern is the most consequential of these: it is what makes &quot;swap Harvester for OpenStack&quot; a plausible future move and is the same model we&#39;ll use for <code>NetworkProvider</code> in M2.</p>
+<hr>
+<h1>6. Data Model</h1>
+<p>PostgreSQL, three tables.</p>
+<h2><code>resources</code></h2>
+<p>The central registry. One row per VM, cluster, or volume managed by DC-API.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>Primary key. Returned to callers as the resource ID.</td>
+</tr>
+<tr>
+<td><code>tenant_id</code></td>
+<td>TEXT</td>
+<td>Asgardeo group → tenant mapping. All quota and isolation checks key off this.</td>
+</tr>
+<tr>
+<td><code>owner_id</code></td>
+<td>TEXT</td>
+<td>Asgardeo <code>sub</code> claim (user who created it).</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>TEXT</td>
+<td>User-supplied display name. Unique per <code>(tenant_id, type)</code>.</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>enum</td>
+<td><code>VIRTUAL_MACHINE</code> | <code>CLUSTER</code> | <code>VOLUME</code></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>enum</td>
+<td><code>PENDING</code> | <code>ACTIVE</code> | <code>FAILED</code> | <code>DELETING</code></td>
+</tr>
+<tr>
+<td><code>provider_type</code></td>
+<td>TEXT</td>
+<td>Which backend handles this resource (e.g. <code>harvester</code>, <code>rancher</code>).</td>
+</tr>
+<tr>
+<td><code>backend_uid</code></td>
+<td>TEXT</td>
+<td>Provider-specific ID. For Harvester VMs: <code>namespace:vmname</code>. For Rancher: cluster ID.</td>
+</tr>
+<tr>
+<td><code>ip_address</code></td>
+<td>TEXT</td>
+<td>Populated by the reconciler from <code>qemu-guest-agent</code> reports.</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>JSONB</td>
+<td>SSH key fingerprint, Rancher cluster name, anything else. JSONB avoids migrations.</td>
+</tr>
+<tr>
+<td><code>created_at</code>, <code>updated_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td><code>updated_at</code> auto-touched via trigger.</td>
+</tr>
+</tbody></table>
+<h2><code>audit_events</code></h2>
+<p>Append-only. Every state transition recorded. <strong>Never UPDATE or DELETE</strong> — auditors rely on this. Cascade-deletes when a resource is deleted (the audit trail dies with the resource; if compliance requires longer retention, that&#39;s a future change).</p>
+<h2><code>quotas</code></h2>
+<p>Per-tenant limits checked <strong>before</strong> any backend call. Today: <code>max_vms</code>, <code>max_clusters</code>, <code>max_cpu</code>, <code>max_memory_gb</code>. A <code>__default__</code> row provides the fallback for newly-onboarded tenants. Admin updates today are direct SQL; a future admin API will replace that.</p>
+<hr>
+<h1>7. Key Flows (Sequence Diagrams)</h1>
+<h2>7.1 Authentication: dcctl login (PKCE)</h2>
+<p>PKCE is used because the CLI binary is public — embedding a client secret would be insecure.</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant U as User
+    participant C as dcctl
+    participant B as Browser
+    participant A as Asgardeo
+
+    U-&gt;&gt;C: dcctl login
+    C-&gt;&gt;C: Generate code_verifier (random)
+    C-&gt;&gt;C: code_challenge = SHA256(code_verifier)
+    C-&gt;&gt;C: Start localhost:8085 callback server
+    C-&gt;&gt;B: Open authorization URL with code_challenge
+    B-&gt;&gt;A: GET /authorize?...&amp;code_challenge=...
+    A-&gt;&gt;U: Login form (username/password / federated SSO)
+    U-&gt;&gt;A: Credentials
+    A-&gt;&gt;B: 302 redirect to localhost:8085/callback?code=...
+    B-&gt;&gt;C: GET /callback?code=...
+    C-&gt;&gt;A: POST /token with code + code_verifier
+    A-&gt;&gt;C: { access_token, id_token, refresh_token }
+    C-&gt;&gt;C: Save to ~/.dcctl/credentials.json
+    C-&gt;&gt;U: &quot;Login successful&quot;
+</code></pre>
+<h2>7.2 VM creation (async with reconciler)</h2>
+<p>VM creation returns <code>202 Accepted</code> immediately. Provisioning takes 2–5 minutes; the reconciler watches and updates the database when Harvester reports the VM as running.</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant C as dcctl
+    participant API as DC-API
+    participant DB as PostgreSQL
+    participant H as Harvester
+    participant R as Reconciler (goroutine)
+
+    C-&gt;&gt;API: POST /v1/virtual-machines (Bearer JWT)
+    API-&gt;&gt;API: Validate JWT (Asgardeo JWKS)
+    API-&gt;&gt;API: Extract tenantID, userID from claims
+    API-&gt;&gt;DB: SELECT quota WHERE tenant_id=...
+    API-&gt;&gt;DB: SELECT count(*) FROM resources WHERE tenant_id=...
+    Note over API: Quota check fails fast if exceeded
+    API-&gt;&gt;API: Generate SSH key pair (ECDSA P-256)
+    API-&gt;&gt;DB: INSERT INTO resources (status=&#39;PENDING&#39;)
+    API-&gt;&gt;DB: INSERT INTO audit_events (action=&#39;CREATE&#39;)
+    API-&gt;&gt;H: ApplyKubeVirt VM manifest (with cloud-init incl. SSH pubkey)
+    H--&gt;&gt;API: VirtualMachine CRD created (provider UID returned)
+    API-&gt;&gt;DB: UPDATE resources SET backend_uid=...
+    API--&gt;&gt;C: 202 Accepted { id, status: PENDING, ssh_private_key }
+    Note over C: Private key returned ONCE; never stored server-side
+
+    loop Every 60s
+        R-&gt;&gt;DB: SELECT * FROM resources WHERE status IN (&#39;PENDING&#39;,&#39;DELETING&#39;)
+        R-&gt;&gt;H: GetVM(backend_uid) for each
+        H--&gt;&gt;R: VirtualMachineInstance status (phase, IP)
+        R-&gt;&gt;DB: UPDATE resources SET status=&#39;ACTIVE&#39;, ip_address=...
+        R-&gt;&gt;DB: INSERT INTO audit_events (action=&#39;STATUS_CHANGE&#39;)
+    end
+
+    C-&gt;&gt;API: GET /v1/virtual-machines/{id} (poll)
+    API-&gt;&gt;DB: SELECT * FROM resources WHERE id=...
+    API--&gt;&gt;C: { status: ACTIVE, ip_address: 10.x.x.x }
+</code></pre>
+<h2>7.3 Cluster creation + kubeconfig retrieval</h2>
+<p>Clusters take longer (~10–12 min for a 3-node RKE2). Same async pattern; kubeconfig is fetched on-demand once the cluster is <code>ACTIVE</code>.</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant C as dcctl
+    participant API as DC-API
+    participant DB as PostgreSQL
+    participant Ranch as Rancher
+
+    C-&gt;&gt;API: POST /v1/clusters
+    API-&gt;&gt;API: JWT validate, quota check
+    API-&gt;&gt;DB: INSERT resources (type=CLUSTER, status=PENDING)
+    API-&gt;&gt;Ranch: POST /v3/cluster + machineConfig + cloudCredential
+    Ranch--&gt;&gt;API: Cluster ID
+    API-&gt;&gt;DB: UPDATE resources SET backend_uid=&lt;cluster-id&gt;
+    API--&gt;&gt;C: 202 Accepted { id, status: PENDING }
+
+    Note over C,Ranch: Reconciler polls Rancher every 60s; transitions PENDING→ACTIVE
+
+    C-&gt;&gt;API: GET /v1/clusters/{id}
+    API--&gt;&gt;C: { status: ACTIVE }
+    C-&gt;&gt;API: GET /v1/clusters/{id}/kubeconfig
+    API-&gt;&gt;Ranch: GET kubeconfig secret
+    Ranch--&gt;&gt;API: kubeconfig YAML
+    API--&gt;&gt;C: kubeconfig bytes
+    C-&gt;&gt;C: Save to --file path
+</code></pre>
+<hr>
+<h1>8. Deployment Topology (LK dev)</h1>
+<pre><code>                                        Office network (192.168.10.0/24)
+                                        ─────────────────────────────────
+                                              │
+                                              │ HTTPS (port 443)
+                                              ▼
+   ┌────────────────────────────────────────────────────────────────────┐
+   │  Harvester host(s) — 192.168.10.15 etc.                            │
+   │                                                                    │
+   │  ┌──────────────────────────────────────────────────────────────┐ │
+   │  │  Rancher VM (rancher-dev-lb @ 192.168.10.35)                 │ │
+   │  │    — manages all RKE2 cluster lifecycles                     │ │
+   │  └──────────────────────────────────────────────────────────────┘ │
+   │                                                                    │
+   │  ┌──────────────────────────────────────────────────────────────┐ │
+   │  │  dcapi-controlplane-rke2 (RKE2 cluster, 1 node)              │ │
+   │  │    Node IP: 192.168.10.38 (mgmt network, static via cloud-init)│
+   │  │    LoadBalancer IP: 192.168.10.37 (Harvester IPPool)         │ │
+   │  │    Hostname: dcapi.lk.internal.wso2.com                      │ │
+   │  │                                                              │ │
+   │  │    Namespaces:                                               │ │
+   │  │      dc-system     — DC-API + PostgreSQL                     │ │
+   │  │      arc-systems   — GitHub Actions runner                   │ │
+   │  │      ingress-nginx — controller for the ingress              │ │
+   │  └──────────────────────────────────────────────────────────────┘ │
+   │                                                                    │
+   │  ┌──────────────────────────────────────────────────────────────┐ │
+   │  │  Tenant RKE2 clusters (created by DC-API as tenants request) │ │
+   │  │    Each is a multi-VM RKE2 cluster, created via Rancher      │ │
+   │  │    Their own CNIs (Cilium / Calico / etc. — tenant choice)   │ │
+   │  └──────────────────────────────────────────────────────────────┘ │
+   │                                                                    │
+   │  ┌──────────────────────────────────────────────────────────────┐ │
+   │  │  Tenant standalone VMs (KubeVirt CRDs)                       │ │
+   │  │    Created by DC-API as tenants request                      │ │
+   │  └──────────────────────────────────────────────────────────────┘ │
+   └────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>The DC-API control plane runs <strong>inside Harvester</strong> (on a guest RKE2 cluster), not on bare metal. This is intentional — the LK Datacenter is a Harvester deployment, so the control plane uses the same substrate. Bootstrap is documented in <code>ops-bootstrap.md</code>; codifying it as Terraform is a cross-cutting milestone.</p>
+<hr>
+<h1>9. API Surface (current — M1 + M1.5 design)</h1>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/healthz</code></td>
+<td>Kubernetes liveness/readiness (no auth)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/images</code></td>
+<td>List available VM images</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/images</code></td>
+<td>Register a new image (provider downloads it)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/networks</code></td>
+<td>List available VM networks</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/virtual-machines</code></td>
+<td>Create VM (async; returns 202)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/virtual-machines</code></td>
+<td>List tenant&#39;s VMs</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/virtual-machines/{id}</code></td>
+<td>Get VM by ID</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/v1/virtual-machines/{id}</code></td>
+<td>Delete VM (async)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/clusters</code></td>
+<td>Create cluster (async)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/clusters</code></td>
+<td>List tenant&#39;s clusters</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/clusters/{id}</code></td>
+<td>Get cluster by ID</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/clusters/{id}/kubeconfig</code></td>
+<td>Fetch kubeconfig once ACTIVE</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/v1/clusters/{id}</code></td>
+<td>Delete cluster (async)</td>
+</tr>
+</tbody></table>
+<p>All <code>/v1/*</code> endpoints require a valid Asgardeo JWT. Per-tenant scoping is enforced server-side from the JWT&#39;s group claim — clients cannot specify or override <code>tenantID</code>.</p>
+<hr>
+<h1>10. Operational Aspects</h1>
+<p>What&#39;s in place:</p>
+<ul>
+<li><strong>Structured logging.</strong> All logs are JSON via zerolog. Log lines include method, path, status, duration_ms, remote address. Easy to ingest into Loki/Elastic.</li>
+<li><strong>Health probes.</strong> <code>/healthz</code> is the liveness/readiness endpoint. Probes hit it without auth.</li>
+<li><strong>Audit trail.</strong> Every state change lands in <code>audit_events</code>. Append-only.</li>
+<li><strong>Graceful shutdown.</strong> <code>main.go</code> traps SIGTERM, stops accepting new requests, waits for in-flight handlers to drain, then exits.</li>
+<li><strong>CI/CD.</strong> <code>.github/workflows/deploy.yaml</code> builds, pushes to ghcr.io, and rolls out the deployment on every <code>main</code> push touching <code>dc-api/**</code>.</li>
+</ul>
+<p>What&#39;s not in place yet (gaps tracked elsewhere):</p>
+<ul>
+<li><strong>Metrics.</strong> No Prometheus endpoint. Plan: add <code>/metrics</code> exposing handler latency histograms, reconciler tick counters, provider call counts.</li>
+<li><strong>Tracing.</strong> No OpenTelemetry instrumentation. Plan: wrap handlers and provider calls with spans; export to a collector.</li>
+<li><strong>Backup / disaster recovery.</strong> PostgreSQL PVC is on Harvester CSI (Longhorn). No automated dumps yet. Plan: nightly <code>pg_dump</code> to S3-compatible storage.</li>
+<li><strong>HA.</strong> Single replica today. Trivial to scale to 2+ once we add leader election to the reconciler (only one replica should reconcile to avoid duplicate provider calls).</li>
+<li><strong>RBAC.</strong> Authentication is in place; authorization (owner/member/viewer roles) is designed in M1.5 but not yet implemented. Today every authenticated user has full access within their tenant.</li>
+</ul>
+<h2>10.1 VPC outbound (F15 — automatic SNAT)</h2>
+<p>Every VPC created by DC-API gets automatic outbound internet access via SNAT — this is invisible to tenants. There is no API surface for it; it is platform infrastructure.</p>
+<p><strong>Mechanism.</strong> DC-API uses three KubeOVN CRDs: a <code>VpcNatGateway</code> (a privileged pod that acts as the SNAT device for the VPC), an <code>IptablesEIP</code> (the external IP assigned to the gateway), and an <code>IptablesSnatRule</code> (the <code>0.0.0.0/0</code> rule that NATs all VPC-egress traffic through the EIP). A <code>0.0.0.0/0</code> static route is also patched into the OVN logical router for the VPC so traffic destined for the internet has a next-hop.</p>
+<p><strong>Per-VPC SNAT.</strong> One EIP is allocated per VPC from the operator-configured <code>DCAPI_VPC_EXTERNAL_POOL_START..END</code> range. The allocation is recorded in the <code>vpc_external_ips</code> PostgreSQL table and released automatically when the VNet is deleted. Concurrent allocation is safe because the DB query uses <code>SELECT ... FOR UPDATE SKIP LOCKED</code>.</p>
+<p><strong>Pool sizing.</strong> The pool is the slice of the external CIDR that remains after excluding network address, broadcast, gateway, and any IPs outside <code>[POOL_START, POOL_END]</code>. KubeOVN&#39;s <code>excludeIps</code> field on the external <code>Subnet</code> object is set to prevent the IPAM from handing those addresses to random workloads.</p>
+<p><strong>Cluster CNI compatibility.</strong> SNAT operates at the VPC logical-router boundary, not inside VMs. Traffic from any cluster CNI (Cilium, Calico, Flannel) is VXLAN-encapsulated by the time it reaches the SNAT rule — the cluster CNI is completely opaque to the SNAT layer.</p>
+<p><strong>Backfill on startup.</strong> On DC-API startup (and on every restart) a goroutine iterates all ACTIVE VNets, checks whether the three NAT CRDs exist, and provisions any that are missing. This ensures the three live VPCs that existed before F15 shipped are covered, and recovers from any partial failure automatically. Backfill failures are logged at WARN but do not prevent startup.</p>
+<p><strong>Implementation files.</strong> <code>internal/providers/kubeovn/nat.go</code> (KubeOVN CRD operations), <code>internal/db/external_ip.go</code> (pool CRUD), <code>internal/api/handlers/vnet.go</code> (<code>provisionVpcNAT</code> called from <code>asyncProvisionVNet</code>), <code>cmd/dc-api/main.go</code> (<code>runNATBackfill</code> goroutine).</p>
+<hr>
+<h1>11. Where to look next</h1>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Document</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Why are we building this?</td>
+<td><code>dc-api-internal-proposal.md</code></td>
+</tr>
+<tr>
+<td>What&#39;s planned for the future?</td>
+<td><code>MILESTONES.md</code></td>
+</tr>
+<tr>
+<td>How do I stand up DC-API in a new region?</td>
+<td><code>ops-bootstrap.md</code></td>
+</tr>
+<tr>
+<td>Asgardeo configuration details</td>
+<td><code>asgardeo-setup.md</code></td>
+</tr>
+<tr>
+<td>Hands-on architectural conventions</td>
+<td><code>CLAUDE.md</code> (root of repo)</td>
+</tr>
+</tbody></table>
+<p>For implementation questions about a specific package, the package-level Go doc comment in each file is the source of truth.</p>
+
+</article></main>
+</div>
+<script src="../scripts/site.js"></script>
+<script>document.getElementById("docnavToggle").addEventListener("click",function(){document.getElementById("docnav").classList.toggle("is-open");});</script>
+</body>
+</html>

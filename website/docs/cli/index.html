@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-density="comfortable">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CLI Reference — OpenStrato</title>
+<meta name="description" content="dcctl command-line reference for the OpenStrato control plane." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../styles/tokens.css">
+<link rel="stylesheet" href="../../styles/main.css">
+<link rel="stylesheet" href="../../styles/docs.css">
+</head>
+<body>
+<a class="skip-link" href="#doc">Skip to content</a>
+
+<header class="nav">
+  <div class="nav__inner container" style="max-width:1440px">
+    <button class="icon-btn docnav-toggle" id="docnavToggle" aria-label="Toggle navigation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <a class="brand" href="../../index.html">
+      <svg class="brand__mark" viewBox="0 0 32 32" fill="none"><rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="var(--accent)"/><rect x="8" y="9" width="16" height="3" rx="1.5" fill="#fff"/><rect x="8" y="14.5" width="16" height="3" rx="1.5" fill="#fff" opacity="0.7"/><rect x="8" y="20" width="10" height="3" rx="1.5" fill="#fff" opacity="0.45"/></svg>
+      <span class="brand__name"><b>Open</b><span>Strato</span></span>
+    </a>
+    <nav class="nav__links" aria-label="Primary">
+      <a class="nav__link" href="../index.html">Docs</a>
+      <a class="nav__link" href="../../api/index.html">API</a>
+      <a class="nav__link" href="index.html" style="color:var(--ink)">CLI</a>
+    </nav>
+    <div class="nav__spacer"></div>
+    <div class="nav__actions">
+      <button class="icon-btn theme-toggle" data-action="toggle-theme" aria-label="Toggle theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      </button>
+      <a class="icon-btn" href="#" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<div class="docshell">
+  <aside class="docnav" id="docnav">
+    <div class="docnav__group">
+      <div class="docnav__title" data-collapse>Getting started <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div>
+      <div class="docnav__list">
+        <a href="#intro" class="is-active">Overview</a>
+        <a href="#install">Install</a>
+        <a href="#global">Global flags</a>
+        <a href="#example">Example session</a>
+      </div>
+    </div>
+    <div class="docnav__group">
+      <div class="docnav__title" data-collapse>Commands <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div>
+      <div class="docnav__list">
+        <a href="#auth">auth · login / logout</a>
+        <a href="#vm">vm</a>
+        <a href="#cluster">cluster</a>
+        <a href="#vnet">vnet</a>
+        <a href="#subnet">subnet</a>
+        <a href="#peering">peering</a>
+        <a href="#network">network</a>
+        <a href="#image">image</a>
+        <a href="#bastion">bastion</a>
+        <a href="#keyvault">keyvault</a>
+        <a href="#tenant">tenant</a>
+        <a href="#project">project</a>
+        <a href="#admin">admin</a>
+      </div>
+    </div>
+  </aside>
+
+  <main class="doccontent" id="doc">
+    <article class="prose" style="max-width:920px">
+      <h1 id="intro">CLI Reference</h1>
+      <p class="lead"><code>dcctl</code> is the command-line interface for the control plane. It talks to the same REST API documented under <a href="../../api/index.html">API</a>, scoped to a tenant and project.</p>
+
+      <div class="callout callout--note">
+        <svg class="callout__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg>
+        <div class="callout__body">This page lists the <strong>real</strong> <code>dcctl</code> command tree, taken from the CLI source. Some descriptions still carry the upstream "Sovereign Cloud / Asgardeo" wording, pending a generic pass.</div>
+      </div>
+
+      <h2 id="install">Install</h2>
+      <div class="code"><div class="code__bar"><span class="code__lang">shell</span><button class="code__copy" data-action="copy" data-copy-target="#i1"><span class="copy-label">Copy</span></button></div>
+      <pre><code id="i1" data-copy="go install github.com/wso2/dcctl@latest">$ go install github.com/wso2/dcctl@latest</code></pre></div>
+      <p>Verify the install and list the top-level command groups:</p>
+      <div class="code"><div class="code__bar"><span class="code__lang">shell</span></div>
+      <pre><code>$ dcctl --help</code></pre></div>
+
+      <h2 id="global">Global flags</h2>
+      <p>These persistent flags apply to every command.</p>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>-o, --output</code></td><td><code>text</code></td><td>Output format.</td></tr>
+          <tr><td><code>--dcapi-url</code></td><td>—</td><td>Control-plane API base URL (overrides config).</td></tr>
+          <tr><td><code>-t, --tenant</code></td><td>active</td><td>Tenant ID for this command.</td></tr>
+          <tr><td><code>--project</code></td><td>active</td><td>Project ID for this command.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="example">Example session</h2>
+      <div class="code"><div class="code__bar"><span class="code__lang">shell</span><button class="code__copy" data-action="copy" data-copy-target="#ex"><span class="copy-label">Copy</span></button></div>
+      <pre><code id="ex" data-copy="dcctl login
+dcctl tenant set acme
+dcctl project set web
+dcctl vm create
+dcctl vm list">$ dcctl login                 <span class="c-comment"># OIDC PKCE flow</span>
+$ dcctl tenant set acme       <span class="c-comment"># pick the active tenant</span>
+$ dcctl project set web       <span class="c-comment"># pick the active project</span>
+$ dcctl vm create             <span class="c-comment"># provision a VM (async, 202)</span>
+$ dcctl vm list               <span class="c-comment"># watch it reach Active</span></code></pre></div>
+
+      <h2 id="auth">auth</h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl login</code></td><td>Authenticate with the identity provider (OIDC).</td></tr>
+          <tr><td><code>dcctl logout</code></td><td>Clear stored credentials (<code>~/.dcctl/credentials.json</code>).</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="vm">vm <span class="badge badge--neutral">Manage virtual machines</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl vm create</code></td><td>Create a virtual machine.</td></tr>
+          <tr><td><code>dcctl vm list</code></td><td>List all virtual machines.</td></tr>
+          <tr><td><code>dcctl vm get &lt;id&gt;</code></td><td>Get a virtual machine.</td></tr>
+          <tr><td><code>dcctl vm delete &lt;id&gt;</code></td><td>Delete a virtual machine.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="cluster">cluster <span class="badge badge--neutral">Manage RKE2 clusters</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl cluster create</code></td><td>Create an RKE2 cluster.</td></tr>
+          <tr><td><code>dcctl cluster list</code></td><td>List all clusters.</td></tr>
+          <tr><td><code>dcctl cluster get &lt;id|name&gt;</code></td><td>Get a cluster.</td></tr>
+          <tr><td><code>dcctl cluster delete &lt;id|name&gt;</code></td><td>Delete a cluster.</td></tr>
+          <tr><td><code>dcctl cluster kubeconfig &lt;cluster-id&gt;</code></td><td>Download kubeconfig for a cluster.</td></tr>
+          <tr><td><code>dcctl cluster node-pool add &lt;cluster&gt;</code></td><td>Add a worker node pool to an ACTIVE cluster.</td></tr>
+          <tr><td><code>dcctl cluster node-pool scale &lt;cluster&gt; &lt;pool&gt;</code></td><td>Scale a node pool to a new node count.</td></tr>
+          <tr><td><code>dcctl cluster node-pool list &lt;cluster&gt;</code></td><td>List all node pools in a cluster.</td></tr>
+          <tr><td><code>dcctl cluster node-pool get &lt;cluster&gt; &lt;pool&gt;</code></td><td>Get a single node pool.</td></tr>
+          <tr><td><code>dcctl cluster node-pool delete &lt;cluster&gt; &lt;pool&gt;</code></td><td>Delete a worker node pool (drains nodes first).</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="vnet">vnet <span class="badge badge--neutral">Virtual networks</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl vnet create &lt;name&gt;</code></td><td>Create a virtual network (VNet).</td></tr>
+          <tr><td><code>dcctl vnet list</code></td><td>List all VNets.</td></tr>
+          <tr><td><code>dcctl vnet get &lt;name-or-id&gt;</code></td><td>Get a VNet.</td></tr>
+          <tr><td><code>dcctl vnet delete &lt;name-or-id&gt;</code></td><td>Delete a VNet.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="subnet">subnet <span class="badge badge--neutral">Subnets within VNets</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl subnet create</code></td><td>Create a subnet within a VNet.</td></tr>
+          <tr><td><code>dcctl subnet list</code></td><td>List subnets in a VNet.</td></tr>
+          <tr><td><code>dcctl subnet get &lt;name-or-id&gt;</code></td><td>Get a subnet.</td></tr>
+          <tr><td><code>dcctl subnet delete &lt;name-or-id&gt;</code></td><td>Delete a subnet.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="peering">peering <span class="badge badge--neutral">VNet peerings</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl peering create</code></td><td>Create a VNet peering.</td></tr>
+          <tr><td><code>dcctl peering list</code></td><td>List peerings for a VNet.</td></tr>
+          <tr><td><code>dcctl peering get &lt;name-or-id&gt;</code></td><td>Get a VNet peering.</td></tr>
+          <tr><td><code>dcctl peering delete &lt;name-or-id&gt;</code></td><td>Delete a VNet peering.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="network">network</h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl network list</code></td><td>List available VM networks (legacy bridges).</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="image">image <span class="badge badge--neutral">VM images</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl image create</code></td><td>Upload a VM image from a URL.</td></tr>
+          <tr><td><code>dcctl image list</code></td><td>List available VM images.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="bastion">bastion <span class="badge badge--neutral">Bastion hosts</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl bastion create</code></td><td>Create an SSH bastion host on a VPC.</td></tr>
+          <tr><td><code>dcctl bastion list</code></td><td>List all bastion hosts.</td></tr>
+          <tr><td><code>dcctl bastion get &lt;id&gt;</code></td><td>Get a bastion host.</td></tr>
+          <tr><td><code>dcctl bastion delete &lt;id&gt;</code></td><td>Delete a bastion host.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="keyvault">keyvault <span class="badge badge--neutral">Key Vaults</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl keyvault create &lt;name&gt;</code></td><td>Create a Key Vault (logical record).</td></tr>
+          <tr><td><code>dcctl keyvault list</code></td><td>List Key Vaults for the active project.</td></tr>
+          <tr><td><code>dcctl keyvault get &lt;id&gt;</code></td><td>Get a Key Vault by UUID.</td></tr>
+          <tr><td><code>dcctl keyvault delete &lt;id&gt;</code></td><td>Delete a Key Vault.</td></tr>
+          <tr><td><code>dcctl keyvault credentials get &lt;id&gt;</code></td><td>Retrieve AppRole credentials (shown once).</td></tr>
+          <tr><td><code>dcctl keyvault credentials rotate &lt;id&gt;</code></td><td>Atomically rotate AppRole credentials (shown once).</td></tr>
+          <tr><td><code>dcctl keyvault secret put &lt;vault-id&gt; &lt;key&gt;</code></td><td>Write a secret value.</td></tr>
+          <tr><td><code>dcctl keyvault secret get &lt;vault-id&gt; &lt;key&gt;</code></td><td>Read a secret value.</td></tr>
+          <tr><td><code>dcctl keyvault secret list &lt;vault-id&gt;</code></td><td>List secret names (values not included).</td></tr>
+          <tr><td><code>dcctl keyvault secret delete &lt;vault-id&gt; &lt;key&gt;</code></td><td>Soft-delete a secret.</td></tr>
+          <tr><td><code>dcctl keyvault secret restore &lt;vault-id&gt; &lt;key&gt;</code></td><td>Restore the latest soft-deleted version.</td></tr>
+          <tr><td><code>dcctl keyvault endpoint create &lt;vault-id&gt;</code></td><td>Create a Private Endpoint into a tenant VPC.</td></tr>
+          <tr><td><code>dcctl keyvault endpoint get &lt;ep-id&gt;</code></td><td>Get a Private Endpoint by UUID.</td></tr>
+          <tr><td><code>dcctl keyvault endpoint list &lt;vault-id&gt;</code></td><td>List Private Endpoints for a Key Vault.</td></tr>
+          <tr><td><code>dcctl keyvault endpoint delete &lt;ep-id&gt;</code></td><td>Delete a Private Endpoint.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="tenant">tenant <span class="badge badge--neutral">Selection, members, service accounts</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl tenant list</code></td><td>List all tenants the authenticated user can access.</td></tr>
+          <tr><td><code>dcctl tenant current</code></td><td>Print the currently active tenant.</td></tr>
+          <tr><td><code>dcctl tenant set &lt;tenant-id&gt;</code></td><td>Set the active tenant for subsequent commands.</td></tr>
+          <tr><td><code>dcctl tenant member create &lt;user_sub&gt;</code></td><td>Invite a user to the tenant.</td></tr>
+          <tr><td><code>dcctl tenant member list</code></td><td>List all human members of the tenant.</td></tr>
+          <tr><td><code>dcctl tenant member delete &lt;user_sub&gt;</code></td><td>Remove a user from the tenant.</td></tr>
+          <tr><td><code>dcctl tenant service-account create &lt;name&gt;</code></td><td>Create a new service account for the tenant.</td></tr>
+          <tr><td><code>dcctl tenant service-account list</code></td><td>List all service accounts for the tenant.</td></tr>
+          <tr><td><code>dcctl tenant service-account delete &lt;name-or-id&gt;</code></td><td>Delete a service account from the tenant.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="project">project <span class="badge badge--neutral">Projects within a tenant</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl project create &lt;project-id&gt;</code></td><td>Create a new project in the active tenant.</td></tr>
+          <tr><td><code>dcctl project get &lt;project-id&gt;</code></td><td>Get a project by ID.</td></tr>
+          <tr><td><code>dcctl project list</code></td><td>List all projects in the active tenant.</td></tr>
+          <tr><td><code>dcctl project update &lt;project-id&gt;</code></td><td>Update a project's capacity quotas.</td></tr>
+          <tr><td><code>dcctl project delete &lt;project-id&gt;</code></td><td>Delete a project.</td></tr>
+          <tr><td><code>dcctl project current</code></td><td>Print the currently active project for the current tenant.</td></tr>
+          <tr><td><code>dcctl project set &lt;project-id&gt;</code></td><td>Set the active project for the current tenant.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="admin">admin <span class="badge badge--neutral">Platform-admin</span></h2>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>dcctl admin tenant create &lt;tenant-id&gt;</code></td><td>Register a new tenant (platform-admin only).</td></tr>
+          <tr><td><code>dcctl admin tenant cap show &lt;tenant-id&gt;</code></td><td>Show the current capacity cap for a tenant.</td></tr>
+          <tr><td><code>dcctl admin tenant cap set &lt;tenant-id&gt;</code></td><td>Adjust a tenant's capacity cap (platform-admin only).</td></tr>
+        </tbody>
+      </table></div>
+    </article>
+  </main>
+</div>
+
+<script src="../../scripts/site.js"></script>
+<script>
+  document.getElementById("docnavToggle").addEventListener("click", function () {
+    document.getElementById("docnav").classList.toggle("is-open");
+  });
+</script>
+</body>
+</html>
