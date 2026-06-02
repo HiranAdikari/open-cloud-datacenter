@@ -298,6 +298,12 @@ session won't know when to spawn it. It's part of the agent-creation task itself
 - **Explain non-trivial changes in plain English in the PR description** — 2–5
   sentences on what it does, why, and any operational side-effect a reviewer would
   notice. Reviewers may not be Go developers. Skip for one-liners and typo fixes.
+- **Open PRs against the template.** Title format is `[Label] Capitalized
+  summary` (`[Feature]`/`[Fix]`/`[Docs]`/`[Chore]`/`[Refactor]`/`[Test]`/`[Perf]`/
+  `[Build]`/`[CI]`). Fill the repo's PR template — *Summary*, *Changes*,
+  *Testing*, and the checklist — never an empty or ad-hoc body. PR/issue bodies are
+  GitHub-Flavored Markdown: write each paragraph on one line (do not hard-wrap),
+  since a single newline renders as a line break.
 
 These are the operational guardrails. The full project-specific traps (KubeOVN
 bridge outages, KubeVirt DHCP races, CDI prime-PVC quota, ARC runner orphans, …)
