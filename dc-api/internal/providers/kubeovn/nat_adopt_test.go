@@ -34,7 +34,14 @@ func newFakeClient(seed ...seeded) (*Client, *dynamicfake.FakeDynamicClient) {
 	}
 	dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listKinds)
 	for _, s := range seed {
-		if _, err := dyn.Resource(s.gvr).Create(context.Background(), s.obj, metav1.CreateOptions{}); err != nil {
+		ri := dyn.Resource(s.gvr)
+		var err error
+		if ns := s.obj.GetNamespace(); ns != "" {
+			_, err = ri.Namespace(ns).Create(context.Background(), s.obj, metav1.CreateOptions{})
+		} else {
+			_, err = ri.Create(context.Background(), s.obj, metav1.CreateOptions{})
+		}
+		if err != nil {
 			panic("seeding fake client: " + err.Error())
 		}
 	}
@@ -231,5 +238,76 @@ func TestExternalNAD_ClusterNetworkLabel(t *testing.T) {
 				t.Fatalf("%s = %q, want %q", labelKey, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestBootstrap_RefusesSubnetOnWrongVlan covers the migration this adoption
+// support exists for: a cluster dc-api already bootstrapped self-managed, now
+// pointed at an externally-managed SDN. The external Subnet still carries the
+// Vlan dc-api created earlier, so returning early on "it exists" would ignore
+// the new configuration, log success, and leave the old ProviderNetwork
+// contending for the same physical port.
+func TestBootstrap_RefusesSubnetOnWrongVlan(t *testing.T) {
+	seed := append(addonObjects(),
+		seeded{nadGVR, func() *unstructured.Unstructured {
+			u := unstruct("k8s.cni.cncf.io/v1", "NetworkAttachmentDefinition", "ovn-vpc-external-network", nil)
+			u.SetNamespace("kube-system")
+			return u
+		}()},
+		// left behind by an earlier self-managed bootstrap
+		seeded{subnetGVR, unstruct("kubeovn.io/v1", "Subnet", "ovn-vpc-external-network",
+			map[string]interface{}{"vlan": "ext-vlan-702", "cidrBlock": "172.22.101.0/25"})},
+	)
+	c, _ := newFakeClient(seed...)
+	c.WithExternalNetwork(lkDevCfg())
+
+	err := c.EnsureExternalNetworkBootstrap(context.Background())
+	if err == nil {
+		t.Fatal("want an error when the existing Subnet is on a different vlan")
+	}
+	for _, want := range []string{"ext-vlan-702", "vlan702", "delete the Subnet"} {
+		if !contains(err.Error(), want) {
+			t.Fatalf("error should mention %q so an operator knows what to do; got: %v", want, err)
+		}
+	}
+}
+
+// TestBootstrap_RefusesVlanOnWrongProvider: KubeOVN binds a Vlan to the
+// ProviderNetwork named in spec.provider, and Subnet validation does not catch
+// a mismatch — traffic would ride the wrong uplink silently.
+func TestBootstrap_RefusesVlanOnWrongProvider(t *testing.T) {
+	c, _ := newFakeClient(
+		seeded{providerNetworkGVR, unstruct("kubeovn.io/v1", "ProviderNetwork", "ovnpn",
+			map[string]interface{}{"defaultInterface": "eno1np0"})},
+		seeded{vlanGVR, unstruct("kubeovn.io/v1", "Vlan", "vlan702",
+			map[string]interface{}{"id": int64(702), "provider": "some-other-pn"})},
+	)
+	c.WithExternalNetwork(lkDevCfg())
+
+	err := c.EnsureExternalNetworkBootstrap(context.Background())
+	if err == nil {
+		t.Fatal("want an error when the adopted Vlan is on a different provider network")
+	}
+	if !contains(err.Error(), "some-other-pn") || !contains(err.Error(), "ovnpn") {
+		t.Fatalf("error should name both the found and expected provider network; got: %v", err)
+	}
+}
+
+// TestBootstrap_AdoptsVlanWithDifferentID: with an adopted Vlan, KubeOVN uses
+// that Vlan's own id. Requiring it to equal the configured VLANID would reject
+// valid setups, so only spec.provider is checked.
+func TestBootstrap_AdoptsVlanWithDifferentID(t *testing.T) {
+	c, _ := newFakeClient(
+		seeded{providerNetworkGVR, unstruct("kubeovn.io/v1", "ProviderNetwork", "ovnpn",
+			map[string]interface{}{"defaultInterface": "eno1np0"})},
+		seeded{vlanGVR, unstruct("kubeovn.io/v1", "Vlan", "vlan702",
+			map[string]interface{}{"id": int64(999), "provider": "ovnpn"})},
+	)
+	cfg := lkDevCfg()
+	cfg.VLANID = 702 // deliberately disagrees with the adopted Vlan's id
+	c.WithExternalNetwork(cfg)
+
+	if err := c.EnsureExternalNetworkBootstrap(context.Background()); err != nil {
+		t.Fatalf("adopted Vlan id must not be required to match VLANID: %v", err)
 	}
 }

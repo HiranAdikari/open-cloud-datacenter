@@ -531,9 +531,21 @@ func (c *Config) ParseReservedIPs() []string {
 	parts := strings.Split(c.VPCExternalReservedIPs, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
-		if t := strings.TrimSpace(p); t != "" {
-			out = append(out, t)
+		t := strings.TrimSpace(p)
+		if t == "" {
+			continue
 		}
+		// Normalise the bounds INSIDE a range, not just the entry as a whole.
+		// These strings are handed to KubeOVN's Subnet excludeIps verbatim, and
+		// its ExpandExcludeIPs splits on ".." WITHOUT trimming the halves - so
+		// "10.0.0.2 .. 10.0.0.9" yields the unparseable "10.0.0.2 " and
+		// " 10.0.0.9", and the range silently excludes nothing. Validation
+		// trims before parsing, so without this the value would validate and
+		// then be written broken.
+		if lo, hi, isRange := strings.Cut(t, ".."); isRange {
+			t = strings.TrimSpace(lo) + ".." + strings.TrimSpace(hi)
+		}
+		out = append(out, t)
 	}
 	return out
 }
