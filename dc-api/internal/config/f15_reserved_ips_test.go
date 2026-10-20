@@ -97,3 +97,52 @@ func TestValidateF15_RejectsBadRange(t *testing.T) {
 		t.Fatalf("want a 'reversed' error, got %q", err.Error())
 	}
 }
+
+// TestParseReservedIPs_NormalisesRangeBounds pins the fix for a bug that
+// validation alone could not catch: ValidateF15 trims the halves of a range
+// before parsing them, so " 10.0.0.2 .. 10.0.0.9 " validates cleanly — but the
+// entry is then handed to KubeOVN's Subnet excludeIps verbatim, and its
+// ExpandExcludeIPs splits on ".." WITHOUT trimming. The bounds arrive as
+// "10.0.0.2 " and " 10.0.0.9", neither parses as an IP, and the range silently
+// excludes nothing. ParseReservedIPs must emit the normalised form.
+func TestParseReservedIPs_NormalisesRangeBounds(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{"spaces around range bounds", "172.22.101.2 .. 172.22.101.63", []string{"172.22.101.2..172.22.101.63"}},
+		{"spaces around entry and bounds", "  172.22.101.2  ..  172.22.101.63  ", []string{"172.22.101.2..172.22.101.63"}},
+		{"already tight", "172.22.101.2..172.22.101.63", []string{"172.22.101.2..172.22.101.63"}},
+		{"single IPs untouched", "10.0.0.1, 10.0.0.2", []string{"10.0.0.1", "10.0.0.2"}},
+		{"mixed", "10.0.0.1, 10.0.0.4 .. 10.0.0.9", []string{"10.0.0.1", "10.0.0.4..10.0.0.9"}},
+		{"empty entries dropped", "10.0.0.1,,  ,10.0.0.2", []string{"10.0.0.1", "10.0.0.2"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := (&Config{VPCExternalReservedIPs: tc.in}).ParseReservedIPs()
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %q, want %q", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("entry %d: got %q, want %q (full: %q)", i, got[i], tc.want[i], got)
+				}
+			}
+		})
+	}
+}
+
+// TestParseReservedIPs_OutputRevalidates guards the round trip: whatever
+// ParseReservedIPs emits must still satisfy validateReservedEntry, so a
+// normalisation that corrupted an entry would be caught here rather than in a
+// cluster.
+func TestParseReservedIPs_OutputRevalidates(t *testing.T) {
+	extNet := mustCIDR(t, "172.22.101.0/25")
+	c := &Config{VPCExternalReservedIPs: " 172.22.101.1 , 172.22.101.2 .. 172.22.101.63 , 172.22.101.127 "}
+	for _, e := range c.ParseReservedIPs() {
+		if err := validateReservedEntry(e, extNet); err != nil {
+			t.Fatalf("entry %q from ParseReservedIPs does not revalidate: %v", e, err)
+		}
+	}
+}

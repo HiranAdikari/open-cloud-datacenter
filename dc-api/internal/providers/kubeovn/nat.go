@@ -128,10 +128,28 @@ func (c *Client) EnsureExternalNetworkBootstrap(ctx context.Context) error {
 			return fmt.Errorf("ensure external network bootstrap: vlan: %w", err)
 		}
 	} else {
-		if err := c.assertExists(ctx, vlanGVR, vlanName); err != nil {
-			return fmt.Errorf("ensure external network bootstrap: adopt vlan: %w", err)
+		// Verify spec.provider, NOT spec.id. With an adopted Vlan, KubeOVN uses
+		// that Vlan's own id, so requiring it to equal cfg.VLANID would reject
+		// valid setups. spec.provider does matter: KubeOVN binds the Vlan to
+		// the ProviderNetwork it names, and Subnet validation does not catch a
+		// mismatch - traffic would ride the wrong uplink with nothing to show
+		// for it.
+		vlan, err := c.dynamic.Resource(vlanGVR).Get(ctx, vlanName, metav1.GetOptions{})
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				return fmt.Errorf("ensure external network bootstrap: adopt vlan: vlans %q not found — it must already exist when configured for adoption", vlanName)
+			}
+			return fmt.Errorf("ensure external network bootstrap: adopt vlan: get %q: %w", vlanName, err)
 		}
-		log.Info().Str("vlan", vlanName).Msg("kubeovn: adopting externally-managed Vlan")
+		gotProvider, _, _ := unstructured.NestedString(vlan.Object, "spec", "provider")
+		if gotProvider != providerName {
+			return fmt.Errorf(
+				"ensure external network bootstrap: adopted Vlan %q has spec.provider %q but the provider network in use is %q — point DCAPI_VPC_EXTERNAL_VLAN_NAME at a Vlan on that provider network",
+				vlanName, gotProvider, providerName)
+		}
+		vlanID, _, _ := unstructured.NestedInt64(vlan.Object, "spec", "id")
+		log.Info().Str("vlan", vlanName).Int64("id", vlanID).Str("providerNetwork", providerName).
+			Msg("kubeovn: adopting externally-managed Vlan")
 	}
 
 	// 3. NAD in kube-system — MUST exist before the Subnet because Harvester's
@@ -498,8 +516,22 @@ func (c *Client) ensureExternalSubnet(ctx context.Context, providerName, cidr, g
 	// Check existence by Get first — Harvester's network webhook returns a
 	// non-AlreadyExists error ("subnet is using the provider already") when the
 	// Subnet exists, which our IsAlreadyExists check below cannot catch.
-	if _, getErr := c.dynamic.Resource(subnetGVR).Get(ctx, subnetName, metav1.GetOptions{}); getErr == nil {
-		return nil // already exists, idempotent
+	if existing, getErr := c.dynamic.Resource(subnetGVR).Get(ctx, subnetName, metav1.GetOptions{}); getErr == nil {
+		// Idempotent, but NOT unconditionally. Switching a cluster from
+		// self-managed to adopted leaves this Subnet bound to the Vlan dc-api
+		// made earlier (ext-vlan-<id>), and returning early here would ignore
+		// the new configuration while still logging success - leaving the old
+		// ProviderNetwork contending for the same physical port, which is the
+		// exact conflict adoption exists to prevent. Refuse instead: changing a
+		// live Subnet's vlan re-homes every EIP on it, so an operator has to
+		// decide, not us.
+		gotVlan, _, _ := unstructured.NestedString(existing.Object, "spec", "vlan")
+		if gotVlan != vlanName {
+			return fmt.Errorf(
+				"external Subnet %q already exists on vlan %q but the configuration asks for %q — delete the Subnet (and any EIPs on it) to let it be recreated, or point the configuration back at %q",
+				subnetName, gotVlan, vlanName, gotVlan)
+		}
+		return nil
 	}
 	_, err := c.dynamic.Resource(subnetGVR).Create(ctx, obj, metav1.CreateOptions{})
 	if err != nil && !k8serrors.IsAlreadyExists(err) {
@@ -557,8 +589,29 @@ func (c *Client) ensureExternalNAD(ctx context.Context, provider string) error {
 		},
 	}
 	_, err := c.dynamic.Resource(nadGVR).Namespace(ns).Create(ctx, obj, metav1.CreateOptions{})
-	if err != nil && !k8serrors.IsAlreadyExists(err) {
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create external NAD %s/%s: %w", ns, nadName, err)
+	}
+
+	// Already present: the create was a no-op, so a changed clusternetwork
+	// would otherwise be ignored in silence. Unlike the Subnet's vlan this is
+	// Harvester bookkeeping rather than a datapath binding - the path is
+	// Vlan -> ProviderNetwork -> NIC - so say so loudly and carry on instead of
+	// refusing to start over a label.
+	existing, getErr := c.dynamic.Resource(nadGVR).Namespace(ns).Get(ctx, nadName, metav1.GetOptions{})
+	if getErr != nil {
+		return nil // cannot compare; the NAD exists, which is what we needed
+	}
+	if got := existing.GetLabels()["network.harvesterhci.io/clusternetwork"]; got != clusterNetwork {
+		log.Warn().
+			Str("nad", ns+"/"+nadName).
+			Str("existing", got).
+			Str("configured", clusterNetwork).
+			Msg("kubeovn: external NAD already exists with a different Harvester clusternetwork label; " +
+				"the configured value is NOT applied — delete the NAD to have it recreated")
 	}
 	return nil
 }
