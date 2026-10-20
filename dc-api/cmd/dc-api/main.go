@@ -207,11 +207,14 @@ func main() {
 			}
 
 			kvClient.WithExternalNetwork(kubeovn.ExternalNetworkConfig{
-				Bridge:      cfg.VPCExternalBridge,
-				CIDR:        cfg.VPCExternalCIDR,
-				Gateway:     cfg.VPCExternalGateway,
-				ReservedIPs: cfg.ParseReservedIPs(),
-				VLANID:      cfg.VPCExternalVLANID,
+				Bridge:          cfg.VPCExternalBridge,
+				CIDR:            cfg.VPCExternalCIDR,
+				Gateway:         cfg.VPCExternalGateway,
+				ReservedIPs:     cfg.ParseReservedIPs(),
+				VLANID:          cfg.VPCExternalVLANID,
+				ProviderNetwork: cfg.VPCExternalProviderNetwork,
+				VlanName:        cfg.VPCExternalVlanName,
+				ClusterNetwork:  cfg.VPCExternalClusterNetwork,
 			})
 			natProvisioner = kvClient
 
@@ -476,10 +479,10 @@ func main() {
 		// local set built once in NewRegistry — byte-identical to the fixed
 		// providers below. The fixed providers remain for router-only callers
 		// (contract harness / tests) that build a router without a Registry.
-		Providers:       provReg,
-		ComputeProvider: computeProvider,
-		ClusterProvider: clusterProvider,
-		NetworkProvider: networkProvider,
+		Providers:           provReg,
+		ComputeProvider:     computeProvider,
+		ClusterProvider:     clusterProvider,
+		NetworkProvider:     networkProvider,
 		NATProvisioner:      natProvisioner,
 		DNSProvisioner:      dnsProvisioner,
 		DNSSearchDomain:     cfg.VPCDNSSearchDomain,
