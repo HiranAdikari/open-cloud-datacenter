@@ -11,6 +11,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"sort"
@@ -174,6 +175,29 @@ type Config struct {
 	VPCExternalGateway     string `envconfig:"VPC_EXTERNAL_GATEWAY"       required:"true"`
 	VPCExternalReservedIPs string `envconfig:"VPC_EXTERNAL_RESERVED_IPS"  default:""`
 	VPCExternalVLANID      int    `envconfig:"VPC_EXTERNAL_VLAN_ID"       default:"0"`
+
+	// ── Adopting an externally-managed SDN ───────────────────────────────────
+	// By default dc-api CREATES its ProviderNetwork (named after the bridge) and
+	// its Vlan (named "ext-vlan-<id>"). That is correct when dc-api owns the SDN.
+	// When the SDN is owned by someone else - e.g. Harvester's bundled
+	// `kubeovn-operator` Addon, which ships its own ProviderNetwork bound to a
+	// dedicated NIC - creating a second ProviderNetwork on the same physical port
+	// and a second Vlan with the same tag puts KubeOVN into a conflict state.
+	//
+	// Set these to the names of the EXISTING objects instead. dc-api then
+	// references them and creates neither, leaving their specs untouched.
+	// Empty (the default) preserves the create-them-ourselves behaviour.
+	//
+	// VPCExternalClusterNetwork sets the external NAD's
+	// network.harvesterhci.io/clusternetwork label explicitly. Harvester's
+	// network webhook reads it at create time and it must name a REAL Harvester
+	// ClusterNetwork. When empty it is derived from VPCExternalBridge by
+	// stripping a "-br" suffix, falling back to "mgmt" - so with an adopted
+	// provider network, where the bridge is no longer a datapath name, the label
+	// would depend on whether the chosen string happens to end in "-br".
+	VPCExternalProviderNetwork string `envconfig:"VPC_EXTERNAL_PROVIDER_NETWORK" default:""`
+	VPCExternalVlanName        string `envconfig:"VPC_EXTERNAL_VLAN_NAME"        default:""`
+	VPCExternalClusterNetwork  string `envconfig:"VPC_EXTERNAL_CLUSTER_NETWORK"  default:""`
 
 	// ── F20 Per-VPC CoreDNS ───────────────────────────────────────────────────
 	// VPCDNSForwarders: comma-separated upstream DNS servers used in the
@@ -436,14 +460,9 @@ func (c *Config) ValidateF15() error {
 			c.VPCExternalGateway, c.VPCExternalCIDR)
 	}
 
-	for _, ipStr := range c.ParseReservedIPs() {
-		ip := net.ParseIP(ipStr)
-		if ip == nil {
-			return fmt.Errorf("DCAPI_VPC_EXTERNAL_RESERVED_IPS contains invalid IP %q", ipStr)
-		}
-		if !extNet.Contains(ip) {
-			return fmt.Errorf("DCAPI_VPC_EXTERNAL_RESERVED_IPS %s is not inside DCAPI_VPC_EXTERNAL_CIDR %s",
-				ipStr, c.VPCExternalCIDR)
+	for _, entry := range c.ParseReservedIPs() {
+		if err := validateReservedEntry(entry, extNet); err != nil {
+			return err
 		}
 	}
 
@@ -463,6 +482,42 @@ func (c *Config) ValidateF15() error {
 func (c *Config) ValidateZones() error {
 	if !c.ZonesEnabled && c.HarvesterKubeconfig == "" {
 		return fmt.Errorf("DCAPI_HARVESTER_KUBECONFIG is required when DCAPI_ZONES_ENABLED=false (single-cluster mode); when zones are enabled, agents provide cluster access")
+	}
+	return nil
+}
+
+// validateReservedEntry checks one DCAPI_VPC_EXTERNAL_RESERVED_IPS entry. An
+// entry is either a single IP or an inclusive range "<lo>..<hi>" - KubeOVN's
+// own excludeIps syntax, which we pass through verbatim. Ranges matter when
+// dc-api shares one VLAN with a subnet owned by someone else and must stay off
+// that subnet's half of the CIDR. Both forms must fall entirely inside the
+// external CIDR.
+func validateReservedEntry(entry string, extNet *net.IPNet) error {
+	lo, hi, isRange := strings.Cut(entry, "..")
+	if !isRange {
+		ip := net.ParseIP(entry)
+		if ip == nil {
+			return fmt.Errorf("DCAPI_VPC_EXTERNAL_RESERVED_IPS contains invalid IP %q", entry)
+		}
+		if !extNet.Contains(ip) {
+			return fmt.Errorf("DCAPI_VPC_EXTERNAL_RESERVED_IPS %s is not inside DCAPI_VPC_EXTERNAL_CIDR %s",
+				entry, extNet.String())
+		}
+		return nil
+	}
+
+	loIP, hiIP := net.ParseIP(strings.TrimSpace(lo)), net.ParseIP(strings.TrimSpace(hi))
+	if loIP == nil || hiIP == nil {
+		return fmt.Errorf("DCAPI_VPC_EXTERNAL_RESERVED_IPS range %q is not a valid <ip>..<ip>", entry)
+	}
+	if !extNet.Contains(loIP) || !extNet.Contains(hiIP) {
+		return fmt.Errorf("DCAPI_VPC_EXTERNAL_RESERVED_IPS range %s is not inside DCAPI_VPC_EXTERNAL_CIDR %s",
+			entry, extNet.String())
+	}
+	// A reversed range silently excludes nothing in KubeOVN, which would hand
+	// out addresses the operator meant to protect. Fail loudly instead.
+	if bytes.Compare(loIP.To16(), hiIP.To16()) > 0 {
+		return fmt.Errorf("DCAPI_VPC_EXTERNAL_RESERVED_IPS range %s is reversed (low bound is above high bound)", entry)
 	}
 	return nil
 }

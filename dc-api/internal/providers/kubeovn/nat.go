@@ -14,9 +14,9 @@
 //
 // Recipe reference: memory/project_f15_recipe.md (proven 2026-05-11).
 // Three hard-coded gotchas from the recipe are called out inline:
-//   1. External subnet name is hardcoded "ovn-vpc-external-network".
-//   2. Subnet provider must be 3-dot-segment: <name>.<ns>.ovn.
-//   3. VPC 0.0.0.0/0 route is YOUR responsibility; merge, don't overwrite.
+//  1. External subnet name is hardcoded "ovn-vpc-external-network".
+//  2. Subnet provider must be 3-dot-segment: <name>.<ns>.ovn.
+//  3. VPC 0.0.0.0/0 route is YOUR responsibility; merge, don't overwrite.
 package kubeovn
 
 import (
@@ -61,8 +61,20 @@ type ExternalNetworkConfig struct {
 	Bridge      string   // host bridge name, e.g. "mgmt-br"
 	CIDR        string   // e.g. "192.168.10.0/24"
 	Gateway     string   // e.g. "192.168.10.254"
-	ReservedIPs []string // IPs to exclude from KubeOVN's IPAM (host nodes, LBs, etc.)
+	ReservedIPs []string // IPs/ranges to exclude from KubeOVN's IPAM (host nodes, LBs, etc.)
 	VLANID      int
+
+	// ProviderNetwork and VlanName adopt an SDN that dc-api does not own —
+	// e.g. Harvester's bundled kubeovn-operator Addon, which ships its own
+	// ProviderNetwork bound to a dedicated NIC. When either is set, dc-api
+	// REFERENCES that object and does not create it, leaving its spec alone.
+	// Empty keeps the original behaviour: derive the name and create it.
+	ProviderNetwork string // existing ProviderNetwork, e.g. "ovnpn"
+	VlanName        string // existing Vlan, e.g. "vlan702"
+
+	// ClusterNetwork sets the external NAD's Harvester clusternetwork label
+	// explicitly. Empty keeps the legacy derive-from-Bridge behaviour.
+	ClusterNetwork string
 }
 
 // externalNet is stored on the Client after WithExternalNetwork() is called.
@@ -93,17 +105,33 @@ func (c *Client) EnsureExternalNetworkBootstrap(ctx context.Context) error {
 	}
 	cfg := c.extNet
 
-	providerName := bridgeToProviderName(cfg.Bridge)
-
-	// 1. ProviderNetwork
-	if err := c.ensureProviderNetwork(ctx, providerName, cfg.Bridge); err != nil {
-		return fmt.Errorf("ensure external network bootstrap: provider network: %w", err)
+	// 1. ProviderNetwork — adopted when the operator named an existing one,
+	// otherwise derived from the bridge and created.
+	providerName := cfg.ProviderNetwork
+	if providerName == "" {
+		providerName = bridgeToProviderName(cfg.Bridge)
+		if err := c.ensureProviderNetwork(ctx, providerName, cfg.Bridge); err != nil {
+			return fmt.Errorf("ensure external network bootstrap: provider network: %w", err)
+		}
+	} else {
+		if err := c.assertExists(ctx, providerNetworkGVR, providerName); err != nil {
+			return fmt.Errorf("ensure external network bootstrap: adopt provider network: %w", err)
+		}
+		log.Info().Str("providerNetwork", providerName).Msg("kubeovn: adopting externally-managed ProviderNetwork")
 	}
 
-	// 2. Vlan
-	vlanName := fmt.Sprintf("ext-vlan-%d", cfg.VLANID)
-	if err := c.ensureVlan(ctx, vlanName, providerName, cfg.VLANID); err != nil {
-		return fmt.Errorf("ensure external network bootstrap: vlan: %w", err)
+	// 2. Vlan — same rule.
+	vlanName := cfg.VlanName
+	if vlanName == "" {
+		vlanName = fmt.Sprintf("ext-vlan-%d", cfg.VLANID)
+		if err := c.ensureVlan(ctx, vlanName, providerName, cfg.VLANID); err != nil {
+			return fmt.Errorf("ensure external network bootstrap: vlan: %w", err)
+		}
+	} else {
+		if err := c.assertExists(ctx, vlanGVR, vlanName); err != nil {
+			return fmt.Errorf("ensure external network bootstrap: adopt vlan: %w", err)
+		}
+		log.Info().Str("vlan", vlanName).Msg("kubeovn: adopting externally-managed Vlan")
 	}
 
 	// 3. NAD in kube-system — MUST exist before the Subnet because Harvester's
@@ -362,6 +390,21 @@ func (c *Client) IsVpcNATPresent(ctx context.Context, vpcName string) (bool, err
 
 // ── Bootstrap helpers ─────────────────────────────────────────────────────────
 
+// assertExists fails fast when an adopted object is missing. Adoption is a
+// deliberate operator choice, so a typo'd or not-yet-created name must surface
+// as a startup error rather than silently leaving the external network
+// half-wired — the Subnet create that follows would fail with a far less
+// obvious message.
+func (c *Client) assertExists(ctx context.Context, gvr schema.GroupVersionResource, name string) error {
+	if _, err := c.dynamic.Resource(gvr).Get(ctx, name, metav1.GetOptions{}); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return fmt.Errorf("%s %q not found — it must already exist when configured for adoption", gvr.Resource, name)
+		}
+		return fmt.Errorf("get %s %q: %w", gvr.Resource, name, err)
+	}
+	return nil
+}
+
 func (c *Client) ensureProviderNetwork(ctx context.Context, name, bridge string) error {
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -397,7 +440,11 @@ func (c *Client) ensureVlan(ctx context.Context, name, providerName string, vlan
 				},
 			},
 			"spec": map[string]interface{}{
-				"id":       vlanID,
+				// int64, NOT int. Unstructured content is restricted to the
+				// JSON-compatible set, and runtime.DeepCopyJSON panics on a
+				// plain int ("cannot deep copy int") — which DeepCopyObject
+				// calls on every client-side copy of this object.
+				"id":       int64(vlanID),
 				"provider": providerName,
 			},
 		},
@@ -417,7 +464,7 @@ func (c *Client) ensureVlan(ctx context.Context, name, providerName string, vlan
 // Gotcha 2: provider must be "ovn-vpc-external-network.kube-system.ovn"
 // (3 dot-segments). Harvester's webhook rejects 2-segment providers.
 func (c *Client) ensureExternalSubnet(ctx context.Context, providerName, cidr, gateway, vlanName string, excludeIPs []string) error {
-	const subnetName = "ovn-vpc-external-network" // HARDCODED — gotcha 1
+	const subnetName = "ovn-vpc-external-network"                  // HARDCODED — gotcha 1
 	const nadProvider = "ovn-vpc-external-network.kube-system.ovn" // HARDCODED — gotcha 2
 
 	excl := make([]interface{}, len(excludeIPs))
@@ -472,8 +519,14 @@ func (c *Client) ensureExternalNAD(ctx context.Context, provider string) error {
 	// convention is "<clusternetwork>-br" (e.g. mgmt-br → mgmt). If the bridge
 	// doesn't follow the convention we fall back to "mgmt" — operators can
 	// override by editing the label post-create if needed.
+	// Explicit beats derived. The derivation only works when the bridge name
+	// ends in "-br"; anything else silently falls back to "mgmt", which is a
+	// coin-flip once the bridge is no longer a datapath name (adopted provider
+	// network). The label must name a real Harvester ClusterNetwork.
 	clusterNetwork := "mgmt"
-	if c.extNet != nil && strings.HasSuffix(c.extNet.Bridge, "-br") {
+	if c.extNet != nil && c.extNet.ClusterNetwork != "" {
+		clusterNetwork = c.extNet.ClusterNetwork
+	} else if c.extNet != nil && strings.HasSuffix(c.extNet.Bridge, "-br") {
 		clusterNetwork = strings.TrimSuffix(c.extNet.Bridge, "-br")
 	}
 
@@ -493,9 +546,9 @@ func (c *Client) ensureExternalNAD(ctx context.Context, provider string) error {
 					// labels the NAD, so they must be set at create-time. Without them,
 					// the SUBNET create that follows fails with
 					// "network type of nad is not kubeovn instead".
-					"dc-api/managed":                            "true",
-					"network.harvesterhci.io/type":              "OverlayNetwork",
-					"network.harvesterhci.io/clusternetwork":    clusterNetwork,
+					"dc-api/managed":                         "true",
+					"network.harvesterhci.io/type":           "OverlayNetwork",
+					"network.harvesterhci.io/clusternetwork": clusterNetwork,
 				},
 			},
 			"spec": map[string]interface{}{
