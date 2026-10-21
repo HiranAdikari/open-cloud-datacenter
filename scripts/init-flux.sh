@@ -658,10 +658,12 @@ cmd_seal() {
   echo "  (values marked ← from TF are auto-resolved; the rest get prompts)"
   echo
 
-  # Hostnames: not in TF outputs today (Stage 2 work). Default from rendered
-  # files so re-running seal doesn't require retyping.
-  ask  dcapi_hostname               "dc-api hostname (for TLS SAN)"      "${default_dcapi:-}"   "$HOSTNAME_RE"
-  ask  cloudui_hostname             "cloud-ui hostname (for TLS SAN)"    "${default_cloudui:-}" "$HOSTNAME_RE"
+  # Hostnames come from the dc-controlplane layer. They are only needed here to
+  # put the right SANs on the ingress certificate, but they were a prompt with
+  # no discoverable source - the fallback below greps the rendered overlay, and
+  # only matches if the hostnames happen to start "dcapi." / "cloud.".
+  auto_or_ask dcapi_hostname   "dc-api hostname (for TLS SAN)"   "dc-controlplane" "dcapi_hostname"    "${default_dcapi:-}"   "$HOSTNAME_RE"
+  auto_or_ask cloudui_hostname "cloud-ui hostname (for TLS SAN)" "dc-controlplane" "cloud_ui_hostname" "${default_cloudui:-}" "$HOSTNAME_RE"
 
   # These come straight from terraform outputs — no typing.
   auto_or_ask_secret rancher_admin_token    "Rancher admin token"               "rancher-auth"   "admin_token"
@@ -685,10 +687,32 @@ cmd_seal() {
 
   # Cluster-only / operator-only — stay prompts.
 
+  # Harvester kubeconfig: the bootstrap layer already takes this as an input, so
+  # read it back rather than asking. The output is relative to THAT layer's
+  # directory (it is how the harvester provider resolves it), so join it there
+  # rather than against our cwd.
   echo
-  echo "  ℹ  Harvester kubeconfig: the file you used in TF for the 00-bootstrap"
-  echo "     layer. Typically: <consumer-repo>/environments/<env>/00-bootstrap/harvester.kubeconfig"
-  ask_file   harvester_kubeconfig_path "Path to Harvester kubeconfig file"
+  harvester_kubeconfig_path=""
+  local _bs_dir _bs_rel
+  _bs_dir="$(resolve_layer_dir bootstrap)"
+  _bs_rel="$(tf_get bootstrap harvester_kubeconfig_path)"
+  if [[ -n "$_bs_dir" && -n "$_bs_rel" ]]; then
+    case "$_bs_rel" in
+      /*) harvester_kubeconfig_path="$_bs_rel" ;;
+       *) harvester_kubeconfig_path="$_bs_dir/${_bs_rel#./}" ;;
+    esac
+    if [[ -r "$harvester_kubeconfig_path" ]]; then
+      echo "  ✓ Harvester kubeconfig  ← from TF (bootstrap.harvester_kubeconfig_path): $harvester_kubeconfig_path"
+    else
+      echo "  !  bootstrap.harvester_kubeconfig_path points at $harvester_kubeconfig_path, which is not readable"
+      harvester_kubeconfig_path=""
+    fi
+  fi
+  if [[ -z "$harvester_kubeconfig_path" ]]; then
+    echo "  ℹ  Harvester kubeconfig: the file you used in TF for the 00-bootstrap"
+    echo "     layer. Typically: <consumer-repo>/environments/<env>/00-bootstrap/harvester.kubeconfig"
+    ask_file harvester_kubeconfig_path "Path to Harvester kubeconfig file"
+  fi
 
 
   # Runner PAT prompt removed — dc-runner retired (no arc/base in flux/platform).
