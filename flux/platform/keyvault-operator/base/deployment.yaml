@@ -24,8 +24,6 @@ spec:
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }
-      imagePullSecrets:
-        - name: ghcr-pull-secret
       containers:
         - name: manager
           # Bumped by Flux Image Automation. Overlay patches the registry org.

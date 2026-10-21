@@ -663,12 +663,6 @@ cmd_seal() {
   ask  dcapi_hostname               "dc-api hostname (for TLS SAN)"      "${default_dcapi:-}"   "$HOSTNAME_RE"
   ask  cloudui_hostname             "cloud-ui hostname (for TLS SAN)"    "${default_cloudui:-}" "$HOSTNAME_RE"
 
-  # GHCR org: not in TF (operator decision). Default grep'd from overlay's
-  # ImageRepository patches so the operator doesn't re-type.
-  local default_ghcr_org
-  default_ghcr_org=$(grep -oE 'ghcr\.io/[a-zA-Z0-9_-]+/dc-api' "$overlay_dir/kustomization.yaml" 2>/dev/null | head -1 | cut -d/ -f2)
-  ask  ghcr_org                     "GHCR owner/org (for image-pull dockerconfigjson)"  "${default_ghcr_org:-}"     "$SLUG_RE"
-
   # These come straight from terraform outputs — no typing.
   auto_or_ask_secret rancher_admin_token    "Rancher admin token"               "rancher-auth"   "admin_token"
   auto_or_ask        harvester_cred_id      "Harvester cloud_credential_id"     "management"     "cloud_credential_id"
@@ -696,12 +690,6 @@ cmd_seal() {
   echo "     layer. Typically: <consumer-repo>/environments/<env>/00-bootstrap/harvester.kubeconfig"
   ask_file   harvester_kubeconfig_path "Path to Harvester kubeconfig file"
 
-  echo
-  echo "  ℹ  GHCR pull-token: classic GitHub PAT for pulling the consumer's"
-  echo "     images from ghcr.io. Generate at:"
-  echo "       https://github.com/settings/tokens (classic)  →  scope: read:packages"
-  echo "     Used by dc-system + flux-system to pull images."
-  ask_secret ghcr_pat                  "GHCR personal-access token (read:packages)"
 
   # Runner PAT prompt removed — dc-runner retired (no arc/base in flux/platform).
 
@@ -806,8 +794,6 @@ cmd_seal() {
        --from-literal=DCAPI_IDP_CLIENT_SECRET="$idp_client_secret" \
        --from-file=DCAPI_HARVESTER_KUBECONFIG="$harvester_kubeconfig_path"
 
-  seal_dockerconfig sealed-ghcr-pull-secret.yaml             ghcr-pull-secret dc-system   "$ghcr_org" "$ghcr_pat"
-  seal_dockerconfig sealed-ghcr-pull-secret-flux-system.yaml ghcr-pull-secret flux-system "$ghcr_org" "$ghcr_pat"
   # keyvault-system pull secret removed — KVI runs on Harvester
   # (TF-deployed), not on dcapi-controlplane.
 
@@ -852,8 +838,6 @@ cmd_seal() {
       print "  - ./sealed-dc-postgres-secret.yaml"
       print "  - ./sealed-dc-api-secrets.yaml"
       print "  - ./sealed-dc-api-tls.yaml"
-      print "  - ./sealed-ghcr-pull-secret.yaml"
-      print "  - ./sealed-ghcr-pull-secret-flux-system.yaml"
       skip = 1
       next
     }

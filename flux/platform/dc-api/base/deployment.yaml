@@ -21,8 +21,6 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         runAsNonRoot: true
-      imagePullSecrets:
-        - name: ghcr-pull-secret
       containers:
         - name: dc-api
           # Marker for Flux Image Automation Controller — auto-bumped on

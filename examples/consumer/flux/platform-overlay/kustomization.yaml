@@ -14,8 +14,6 @@ resources:
   # - ./sealed-dc-postgres-secret.yaml
   # - ./sealed-dc-api-secrets.yaml
   # - ./sealed-dc-api-tls.yaml
-  # - ./sealed-ghcr-pull-secret.yaml
-  # - ./sealed-ghcr-pull-secret-flux-system.yaml
   #
   # keyvault-system ghcr-pull-secret is NOT here. KVI controller runs
   # on the Harvester cluster (TF-deployed), not on dcapi-controlplane.
