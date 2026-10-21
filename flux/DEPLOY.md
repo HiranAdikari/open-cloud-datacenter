@@ -261,7 +261,6 @@ You need these values handy:
 | Harvester kubeconfig path | the file you've been pointing layer 00's `harvester_kubeconfig` at |
 | Asgardeo BFF client_id + secret | `terraform output -raw bff_client_id` / `bff_client_secret` in layer 03 |
 | Asgardeo rancher-sso client_id | `terraform output -raw client_id` in layer 03 |
-| Asgardeo cloud-ui SPA client_id | `terraform output -raw cloud_ui_client_id` in layer 03 |
 | GHCR PAT | https://github.com/settings/tokens — `read:packages` scope |
 
 Then re-run the wizard with `--seal-secrets`:

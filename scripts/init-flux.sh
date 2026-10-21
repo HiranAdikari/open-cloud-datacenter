@@ -613,7 +613,6 @@ cmd_seal() {
   auto_or_ask_secret bff_client_id          "Asgardeo BFF client_id"            "asgardeo-auth"  "bff_client_id"
   auto_or_ask_secret bff_client_secret      "Asgardeo BFF client_secret"        "asgardeo-auth"  "bff_client_secret"
   auto_or_ask        rancher_oidc_client_id "Asgardeo rancher-sso client_id"    "asgardeo-auth"  "client_id"
-  auto_or_ask        cloud_ui_client_id     "Asgardeo cloud-ui SPA client_id"   "asgardeo-auth"  "cloud_ui_client_id"
 
   # IdP directory M2M credential (optional feature) — TF-only, never a
   # prompt: when the asgardeo-auth layer registers no directory app, the
@@ -697,11 +696,14 @@ cmd_seal() {
   # Sourcing it here (instead of hand-assembling) is what keeps a from-scratch
   # bootstrap and an ad-hoc re-seal byte-identical, and stops a client from
   # being silently dropped (which is how dcctl fell out of the list before).
-  # Fallback: the legacy trio for consumers whose asgardeo-auth predates the
-  # output (it won't include dcctl — add the output to fix that).
+  # Fallback for consumers whose asgardeo-auth predates the output. It covers
+  # only rancher-sso and the cloud-ui BFF — not dcctl, and not the standalone
+  # cloud-ui SPA client, which no longer exists: the BFF now fronts the web
+  # console, so there is no separate SPA client to admit. Add the
+  # dc_api_oidc_audiences output rather than extending this list.
   oidc_audience="$(tf_get asgardeo-auth dc_api_oidc_audiences)"
   if [[ -z "$oidc_audience" ]]; then
-    oidc_audience="$rancher_oidc_client_id,$bff_client_id,$cloud_ui_client_id"
+    oidc_audience="$rancher_oidc_client_id,$bff_client_id"
   fi
 
   seal() {
