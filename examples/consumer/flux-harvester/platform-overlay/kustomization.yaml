@@ -16,18 +16,11 @@ resources:
   # - https://github.com/wso2/open-cloud-datacenter//flux/platform/dc-agent/base?ref=controlplane
 
 # ── Host-cluster patches ─────────────────────────────────────────────────────
-# The OCD bases assume a sealed ghcr-pull-secret exists. On the host cluster
-# there is no sealed-secrets controller and the images are PUBLIC GHCR
-# packages, so strip the pull-secret references rather than provisioning one.
+# The pull-secret strip that used to live here is gone: the OCD bases no longer
+# reference ghcr-pull-secret at all, because the published images are public.
+# A JSON-patch `remove` on a path that no longer exists is a hard error, so
+# these patches had to go with it.
 patches:
-  - target: {kind: Deployment, name: keyvault-controller-manager}
-    patch: |-
-      - op: remove
-        path: /spec/template/spec/imagePullSecrets
-  - target: {kind: ImageRepository, name: keyvault-operator}
-    patch: |-
-      - op: remove
-        path: /spec/secretRef
   # ── Controller-only: leave cluster-scoped CRDs to Terraform ────────────────
   # CRDs hold live CRs with cleanup finalizers; keep them TF-owned so Flux
   # never prunes them. Delete the base's bundled CRDs from this build output.

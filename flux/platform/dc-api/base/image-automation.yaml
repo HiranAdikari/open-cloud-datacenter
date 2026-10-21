@@ -15,8 +15,6 @@ spec:
   interval: 5m
   # Pull credentials for scanning private GHCR packages. The wizard's
   # --seal-secrets path drops this Secret into flux-system.
-  secretRef:
-    name: ghcr-pull-secret
 ---
 apiVersion: image.toolkit.fluxcd.io/v1beta2
 kind: ImagePolicy
