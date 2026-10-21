@@ -38,7 +38,13 @@
 #                           the upstream-safe `git push -u origin HEAD:<branch>`
 #                           form. Pass --no-git if you want to review the diff
 #                           or batch the push with other work.
-#   --remote <name>         Git remote to push to. Default: origin.
+#   --remote <name>         Git remote to push to. Default: derived from the
+#                           cluster's GitRepository/flux-system URL, so the seal
+#                           lands where Flux actually reads from.
+#   --branch <name>         Branch to push to. Default: derived the same way.
+#                           Your checked-out branch is NOT used - sealing while
+#                           standing on main would otherwise push secrets to a
+#                           branch Flux never reads.
 #   -h, --help              Show this help.
 
 set -euo pipefail
@@ -67,7 +73,8 @@ consumer_dir=""
 env_name=""
 force=false
 no_git=false
-git_remote="origin"
+git_remote=""
+git_branch=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -76,6 +83,7 @@ while [[ $# -gt 0 ]]; do
     --force)        force=true; shift ;;
     --no-git)       no_git=true; shift ;;
     --remote)       git_remote="$2"; shift 2 ;;
+    --branch)       git_branch="$2"; shift 2 ;;
     -h|--help)
       sed -n '2,/^set -euo/p' "$0" | sed 's/^# \?//;$d'
       exit 0
@@ -306,6 +314,66 @@ auto_or_ask_secret() {
 #
 # Opt out with --no-git on the script invocation (the script then prints
 # the exact commands to run by hand).
+# ── Resolve where Flux actually reads from ───────────────────────────────────
+# The cluster is the source of truth. GitRepository/flux-system states the exact
+# URL and branch Flux reconciles; deriving from it means the seal cannot land on
+# the wrong branch because of whatever the operator happens to have checked out.
+# Explicit --remote/--branch still win, for disconnected use.
+resolve_flux_target() {
+  [[ -n "$git_remote" && -n "$git_branch" ]] && return 0
+
+  local url branch
+  url="$(kubectl get gitrepository -n flux-system flux-system -o jsonpath='{.spec.url}' 2>/dev/null || true)"
+  branch="$(kubectl get gitrepository -n flux-system flux-system -o jsonpath='{.spec.ref.branch}' 2>/dev/null || true)"
+
+  if [[ -z "$url" || -z "$branch" ]]; then
+    echo "  ✗ cannot read GitRepository/flux-system from the current context." >&2
+    echo "    Flux must be bootstrapped first, or pass --remote and --branch." >&2
+    return 1
+  fi
+  [[ -z "$git_branch" ]] && git_branch="$branch"
+
+  if [[ -z "$git_remote" ]]; then
+    # Match the GitRepository URL against configured remotes, comparing on
+    # owner/repo so ssh://git@ssh.github.com:443/o/r.git and
+    # https://github.com/o/r.git are recognised as the same repository.
+    local want me name
+    want="$(printf '%s' "$url" | sed -E 's#^(https?://|ssh://)?(git@)?[^/]+[:/]##; s#\.git$##' | tr 'A-Z' 'a-z')"
+    while read -r name; do
+      [[ -z "$name" ]] && continue
+      me="$(git remote get-url "$name" 2>/dev/null | sed -E 's#^(https?://|ssh://)?(git@)?[^/]+[:/]##; s#\.git$##' | tr 'A-Z' 'a-z')"
+      [[ "$me" == "$want" ]] && { git_remote="$name"; break; }
+    done < <(git remote)
+  fi
+
+  if [[ -z "$git_remote" ]]; then
+    echo "  ✗ no git remote in $consumer_dir points at the repository Flux reads:" >&2
+    echo "      $url" >&2
+    echo "    add one, or pass --remote <name>." >&2
+    return 1
+  fi
+  echo "  ✓ Flux reads $git_remote/$git_branch (from GitRepository/flux-system)"
+}
+
+# ── Refuse to touch git mid-operation ────────────────────────────────────────
+# A rebase, merge or cherry-pick in progress makes `git commit` mean something
+# other than "record the sealed files" - it can conclude the in-flight operation
+# instead. Fail early and legibly rather than corrupting someone's working state.
+assert_git_idle() {
+  local d; d="$(git rev-parse --git-dir 2>/dev/null)" || return 0
+  local op=""
+  [[ -d "$d/rebase-merge" || -d "$d/rebase-apply" ]] && op="rebase"
+  [[ -f "$d/MERGE_HEAD" ]]       && op="merge"
+  [[ -f "$d/CHERRY_PICK_HEAD" ]] && op="cherry-pick"
+  [[ -f "$d/BISECT_LOG" ]]       && op="bisect"
+  if [[ -n "$op" ]]; then
+    echo "  ✗ a $op is in progress in $consumer_dir." >&2
+    echo "    Finish or abort it first (git $op --abort), then re-run." >&2
+    echo "    Or pass --no-git and commit the sealed files yourself." >&2
+    return 1
+  fi
+}
+
 git_commit_push() {
   local path="$1" message="$2"
 
@@ -324,26 +392,12 @@ git_commit_push() {
       return 0
     fi
 
-    # Must be on a branch (not detached HEAD) for the push to know where
-    # to send things.
-    local branch
-    if ! branch=$(git symbolic-ref --short HEAD 2>/dev/null); then
-      echo "  ✗ HEAD is detached — can't auto-push" >&2
-      echo "    check out a branch and run by hand:" >&2
-      echo "      cd $consumer_dir" >&2
-      echo "      git add $path" >&2
-      echo "      git commit -m \"$message\"" >&2
-      echo "      git push -u $git_remote HEAD:refs/heads/<branch>" >&2
-      return 1
-    fi
-
-    # Verify the remote exists.
-    if ! git remote get-url "$git_remote" >/dev/null 2>&1; then
-      echo "  ✗ git remote '$git_remote' not configured in $consumer_dir" >&2
-      echo "    add it with: git remote add $git_remote <url>" >&2
-      echo "    or re-run with --remote <name> --no-git to do it yourself" >&2
-      return 1
-    fi
+    # Where Flux reads from, not where the operator happens to stand. Also
+    # refuse to run mid-rebase/merge/cherry-pick. A detached HEAD is fine:
+    # we push HEAD:refs/heads/<branch>, which needs no local branch at all.
+    assert_git_idle || return 1
+    resolve_flux_target || return 1
+    local branch="$git_branch"
 
     # Stage + commit any new changes under $path.
     if [[ -n "$(git status --porcelain -- "$path" 2>/dev/null)" ]]; then
@@ -351,7 +405,9 @@ git_commit_push() {
       if git diff --cached --quiet -- "$path"; then
         echo "  ✓ working tree under $path matches index — nothing to commit"
       else
-        git commit -m "$message" >/dev/null
+        # `-- "$path"` is load-bearing: a bare `git commit` records the whole
+        # index, sweeping in any unrelated work the operator had staged.
+        git commit -m "$message" -- "$path" >/dev/null
         echo "  ✓ committed: $message"
       fi
     else
@@ -383,14 +439,20 @@ git_commit_push() {
       if git push -u "$git_remote" "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
         return 0
       fi
-      echo "  ! push rejected (remote moved); auto-rebasing onto $git_remote/$branch"
+      # Remote moved - most often Flux's own image-automation commits. Do NOT
+      # rebase: this branch is written by image-automation too, and rewriting
+      # shared history from a script is how an operator ends up with a
+      # committed-but-unpushed tree they did not ask for. Fetch, and only
+      # continue if the merge is a clean fast-forward.
+      echo "  ! push rejected (remote moved); fetching $git_remote/$branch"
       git fetch "$git_remote" "$branch" >/dev/null 2>&1 || true
-      if ! git pull --rebase "$git_remote" "$branch" >/dev/null 2>&1; then
-        git rebase --abort >/dev/null 2>&1 || true
-        echo "  ✗ auto-rebase hit a conflict — needs manual resolution:" >&2
+      if ! git merge --ff-only "$git_remote/$branch" >/dev/null 2>&1; then
+        echo "  ✗ $git_remote/$branch has diverged from your HEAD." >&2
+        echo "    The sealed files are committed locally but not pushed." >&2
+        echo "    Reconcile it yourself, then push:" >&2
         echo "      cd $consumer_dir" >&2
-        echo "      git pull --rebase $git_remote $branch" >&2
-        echo "      # resolve conflicts, then:" >&2
+        echo "      git fetch $git_remote $branch" >&2
+        echo "      git rebase $git_remote/$branch   # or merge" >&2
         echo "      git push $git_remote HEAD:refs/heads/$branch" >&2
         return 1
       fi
