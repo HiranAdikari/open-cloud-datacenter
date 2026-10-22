@@ -701,7 +701,10 @@ cmd_seal() {
       /*) harvester_kubeconfig_path="$_bs_rel" ;;
        *) harvester_kubeconfig_path="$_bs_dir/${_bs_rel#./}" ;;
     esac
-    if [[ -r "$harvester_kubeconfig_path" ]]; then
+    # -f as well as -r: a readable DIRECTORY passes -r, and the kubectl
+    # --from-file below would then fail with something far less obvious than
+    # the prompt this is meant to avoid.
+    if [[ -f "$harvester_kubeconfig_path" && -r "$harvester_kubeconfig_path" ]]; then
       echo "  ✓ Harvester kubeconfig  ← from TF (bootstrap.harvester_kubeconfig_path): $harvester_kubeconfig_path"
     else
       echo "  !  bootstrap.harvester_kubeconfig_path points at $harvester_kubeconfig_path, which is not readable"
