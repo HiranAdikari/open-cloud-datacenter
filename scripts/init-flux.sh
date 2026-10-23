@@ -38,6 +38,10 @@
 #                           the upstream-safe `git push -u origin HEAD:<branch>`
 #                           form. Pass --no-git if you want to review the diff
 #                           or batch the push with other work.
+#   --consumer-dir <path>   Consumer repo. Default: git toplevel of $PWD, when
+#                           that repo has an environments/ directory.
+#   --env-name <name>       Environment under environments/. Default: the only
+#                           one carrying a flux/ overlay; required if several.
 #   --remote <name>         Git remote to push to. Default: derived from the
 #                           cluster's GitRepository/flux-system URL, so the seal
 #                           lands where Flux actually reads from.
@@ -95,8 +99,46 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -z "$consumer_dir" || -z "$env_name" ]] && {
-  echo "missing required: --consumer-dir + --env-name (use --help)" >&2
+# ── Infer consumer-dir and env-name ──────────────────────────────────────────
+# Both are discoverable from where the operator is standing, and making them
+# mandatory meant every invocation carried two paths that the repo layout
+# already determines. Explicit flags still win.
+#
+# consumer_dir: the git toplevel of $PWD, provided it looks like a consumer
+# repo (has an environments/ directory). Anything else is ambiguous, so ask.
+if [[ -z "$consumer_dir" ]]; then
+  _top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$_top" && -d "$_top/environments" ]]; then
+    consumer_dir="$_top"
+    echo "  ✓ consumer-dir  $consumer_dir (git toplevel)"
+  fi
+fi
+[[ -z "$consumer_dir" ]] && {
+  echo "✗ --consumer-dir not given and \$PWD is not inside a consumer repo" >&2
+  echo "  (expected a git repo containing an environments/ directory)" >&2
+  exit 4
+}
+
+# env_name: the single directory under environments/ that carries a flux/
+# overlay. With several, the operator has to say which - guessing would seal
+# secrets into the wrong environment.
+if [[ -z "$env_name" ]]; then
+  _envs=()
+  for _d in "$consumer_dir"/environments/*/; do
+    [[ -d "$_d/flux" ]] && _envs+=("$(basename "$_d")")
+  done
+  if [[ ${#_envs[@]} -eq 1 ]]; then
+    env_name="${_envs[0]}"
+    echo "  ✓ env-name      $env_name (only environment with a flux/ overlay)"
+  elif [[ ${#_envs[@]} -gt 1 ]]; then
+    echo "✗ --env-name not given and several environments have a flux/ overlay:" >&2
+    printf '    %s\n' "${_envs[@]}" >&2
+    echo "  Pass --env-name <name>; guessing would seal into the wrong one." >&2
+    exit 4
+  fi
+fi
+[[ -z "$env_name" ]] && {
+  echo "✗ --env-name not given and no environment under $consumer_dir/environments has a flux/ overlay" >&2
   exit 4
 }
 
